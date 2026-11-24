@@ -1,0 +1,6 @@
+{
+  "name": "kio",
+  "namespace": "frameworks",
+  "url": "https://invent.kde.org/frameworks/kio.git",
+  "description": "KDE resource and network access"
+}

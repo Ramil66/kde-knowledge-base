@@ -1,0 +1,5 @@
+title: Report an overlong file name
+source: example
+external_id: "527726"
+type: bug
+description: Preserve the error returned by the file system.

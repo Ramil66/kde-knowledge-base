@@ -1,0 +1,38 @@
+# Структура базы данных
+
+```mermaid
+erDiagram
+    repositories ||--o{ branches : contains
+    tasks ||--o{ task_branches : has
+    branches ||--o{ task_branches : solves
+    branches ||--o{ merge_requests : proposes
+    repositories ||--o{ merge_requests : targets
+    merge_requests ||--o{ discussions : contains
+    discussions ||--o{ comments : contains
+    users o|--o{ comments : writes
+    comments o|--o{ comments : replies
+    comments ||--o{ code_positions : locates
+    repositories ||--o{ commits : contains
+    users o|--o{ commits : authors
+    commits ||--o{ changed_files : modifies
+    commits ||--o{ mr_commits : appears
+    merge_requests ||--o{ mr_commits : includes
+    raw_documents ||--o{ document_links : supports
+    repositories o|--o{ document_links : cites
+    tasks o|--o{ document_links : cites
+    merge_requests o|--o{ document_links : cites
+    tasks ||--o{ task_events : tracks
+    branches ||--o{ test_runs : checks
+```
+
+## Ограничения целостности
+
+* Репозиторий определяется каноническим URL. Название может совпасть у нескольких репозиториев. В таком случае CLI принимает URL.
+* Ветка определяется целевым репозиторием, URL исходного репозитория и именем ветки. Для ветки собственного репозитория указывается его же URL. Связь задачи и ветки имеет составной первичный ключ.
+* Номер MR уникален в пределах целевого репозитория. У задачи может быть внешний номер в определённом источнике. Задача без внешнего номера доступна по локальному ID.
+* Обсуждения принадлежат MR, комментарии принадлежат обсуждению. Автор может быть неизвестен. Позиция замечания хранит путь, ревизию и строки.
+* SHA коммита уникален в репозитории. Таблица `mr_commits` связывает коммит с несколькими MR. Файлы и diff принадлежат коммиту.
+* Таблицы `repository_dependencies`, `task_dependencies` и `mr_dependencies` хранят направленные пары. Ссылка на себя запрещена.
+* Оригинал хранится в `raw_documents` как текст UTF-8 со всеми исходными пробелами и переводами строк. Ключ повторного импорта учитывает тип документа, формат, источник и SHA-256 исходного текста. Связь в `document_links` указывает ровно на одну сущность. Удаление сущности сохраняет оригинал.
+* Внешние ключи включаются при каждом подключении. Записи, на которые ссылается история работы, защищены от удаления. Зависимые строки принадлежности удаляются каскадно.
+* Виртуальная таблица `search_index` содержит поисковые копии текста репозиториев, задач, MR, комментариев и оригиналов. Индекс обслуживают триггеры SQLite. Версию схемы хранит Alembic.

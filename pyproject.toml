@@ -1,0 +1,30 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "kde-knowledge-base"
+version = "0.1.0"
+description = "A local, source-backed knowledge base for KDE development"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "SQLAlchemy>=2.0,<3", "alembic>=1.13,<2", "pydantic>=2.7,<3",
+  "typer>=0.16,<1", "rich>=13", "PyYAML>=6",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.9"]
+
+[project.scripts]
+kde-kb = "kde_kb.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/kde_kb"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
