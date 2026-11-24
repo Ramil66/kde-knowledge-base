@@ -1,0 +1,224 @@
+core: Add a reusable FuseMountJob
+Open
+core: Add a reusable FuseMountJob
+ ramilnur/kio:feature/fuse-mount-job
+into
+master
+Overview 
+9
+Commits 
+3
+Pipelines 
+8
+Reports 
+0
+Changes 
+8
+2
+2 open threads
+Add KIO::FuseMountJob to expose remote URLs as local paths through kio-fuse, with configurable timeouts and error reporting.
+
+Use it in FilePreviewJob to replace the direct D-Bus calls.
+
+Merge request reports
+Members who can merge are allowed to add commits.
+Merge request pipeline #1401216 passed
+
+Merge request pipeline passed for 948dec94 3 weeks ago
+
+Test coverage 63.00% (1.00%) from 2 jobs 
+Approved by
+Méven Car
+Merge blocked: 2 checks failed
+Open threads must be resolved.
+Merge conflicts must be resolved.
+Merge details
+
+The source branch is
+205 commits behind
+the target branch.
+Source branch will be rebased without pipeline.
+3 commits will be added to master.
+Source branch will be deleted.
+Activity
+Ramil Nurmanov mentioned in merge request utilities/ark!348 1 month ago
+Méven Car
+Méven Car
+@meven
+1 month ago
+Developer
+This would allow us to support other fuse implementation like systemd's, making kio-extras potentially optional for smb/nfs/sftp mounts.
+
+That might make a lot of sense to share the implementations details with other DE and systems to share the relatively hight maintenance cost associated with it.
+
+Méven Car
+Méven Car
+@meven
+1 month ago
+Developer
+desktopexecparser.cpp could be ported too.
+
+Maybe later, at least in a separate commit.
+
+I wouldn't have minded the previewjob porting be in its own commit.
+
+Edited 1 month ago by Méven Car
+Méven Car approved this merge request 1 month ago
+Méven Car mentioned in merge request system/kio-fuse!91 1 month ago
+Ramil Nurmanov added 3 commits 1 month ago
+e12a7b94 - core: Add a reusable FuseMountJob
+aa3106e3 - gui: Port FilePreviewJob to FuseMountJob
+2f4b66eb - core: Port DesktopExecParser to FuseMountJob
+Compare with previous version
+
+Méven Car mentioned in merge request graphics/koko!382 1 month ago
+Méven Car
+Méven Car @meven started a thread on an old version of the diff 1 month ago
+Resolved 1 month ago by Ramil Nurmanov
+src/core/fusemountjob.h  0 → 100644
+ * If kio-fuse is not available, the job fails with KIO::ERR_UNSUPPORTED_ACTION,
+ * which lets callers fall back to another approach, e.g. copying the file.
+ * This is also the case when KIO was built without D-Bus support.
+ *
+ * \code
+ *    auto *job = new KIO::FuseMountJob(url, this);
+ *    connect(job, &KJob::result, this, [job]() {
+ *        if (!job->error()) {
+ *            const QString path = job->localPath();
+ *            ...
+ *        }
+ *    });
+ *    job->start();
+ * \endcode
+ *
+ * \since 6.31
+Méven Car
+Méven Car
+@meven
+1 month ago
+Developer
+Suggested change 
+Applied
+ * \since 6.31
+ * \since 6.32
+Ramil Nurmanov
+changed this line in version 3 of the diff 1 month ago 
+Reply…
+Ramil Nurmanov added 1 commit 1 month ago
+260b902b - Apply 1 suggestion(s) to 1 file(s)
+Compare with previous version
+
+Ramil Nurmanov resolved all threads 1 month ago
+Ramil Nurmanov added 33 commits 1 month ago
+260b902b...6307d102 - 23 earlier commits
+9735764d - deletejobtest: kill the recursive deletion only after a byte report
+fcb6c372 - BatchRenameJob: don't drop the tail of a name after a non-extension dot
+c8663e65 - SVN_SILENT made messages (.desktop file) - always resolve ours
+488823df - GIT_SILENT Sync po/docbooks with svn
+a3e68d02 - file_win: remove a directory as soon as it is empty
+9a4c4d9a - Deliver the kill of a job to its worker process on Windows
+f5b3e415 - autotests: build deletejobtest on Windows
+8de57c77 - trash: implement the recycle-bin worker on Windows
+bb777751 - trash: add a Windows recycle-bin worker test
+6697c698 - autotests: run the delete-or-trash job test on Windows
+Compare with previous version
+
+ Toggle commit list
+Ramil Nurmanov added 37 commits 1 month ago
+6697c698...5a99a680 - 33 commits from branch frameworks:master
+1a3bed1e - core: Add a reusable FuseMountJob
+3698d17d - gui: Port FilePreviewJob to FuseMountJob
+8269d434 - core: Port DesktopExecParser to FuseMountJob
+02cfbf71 - Apply 1 suggestion(s) to 1 file(s)
+Compare with previous version
+
+ Toggle commit list
+Méven Car
+Méven Car
+@meven
+1 month ago
+Developer
+Could be used by the desktop-portal.
+
+Méven Car added 52 commits 1 month ago
+02cfbf71...eed7ae04 - 48 commits from branch frameworks:master
+0e9947c2 - core: Add a reusable FuseMountJob
+4e175755 - gui: Port FilePreviewJob to FuseMountJob
+b14e53f9 - core: Port DesktopExecParser to FuseMountJob
+d7304223 - Apply 1 suggestion(s) to 1 file(s)
+Compare with previous version
+
+ Toggle commit list
+Méven Car added 
+API
+ label 3 weeks ago
+Méven Car
+Méven Car
+@meven
+3 weeks ago
+Developer
+Resolved 3 weeks ago by Ramil Nurmanov
+d7304223 must be squashed/folded in another commit
+
+no Apply x suggestion should be tolerated.
+
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+3 weeks ago
+Author
+Contributor
+Done, folded it into the relevant commit.
+
+Reply…
+Méven Car unapproved this merge request 3 weeks ago
+Ramil Nurmanov added 3 commits 3 weeks ago
+1a3bed1e - core: Add a reusable FuseMountJob
+3698d17d - gui: Port FilePreviewJob to FuseMountJob
+948dec94 - core: Port DesktopExecParser to FuseMountJob
+Compare with previous version
+
+Ramil Nurmanov resolved all threads 3 weeks ago
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+1 day ago
+Author
+Contributor
+Hi @meven , all review feedback has been addressed. Could you take another look when you have a chance? Thanks!
+
+Méven Car
+Méven Car
+@meven
+10 hours ago
+Developer
+Conflict: This file was modified in both the source and target branches
+
+Reply…
+Méven Car
+Méven Car @meven started a thread on the diff 8 hours ago
+src/core/fusemountjob.h  0 → 100644
+ * If kio-fuse is not available, the job fails with KIO::ERR_UNSUPPORTED_ACTION,
+ * which lets callers fall back to another approach, e.g. copying the file.
+ * This is also the case when KIO was built without D-Bus support.
+ *
+ * \code
+ *    auto *job = new KIO::FuseMountJob(url, this);
+ *    connect(job, &KJob::result, this, [job]() {
+ *        if (!job->error()) {
+ *            const QString path = job->localPath();
+ *            ...
+ *        }
+ *    });
+ *    job->start();
+ * \endcode
+ *
+ * \since 6.32
+Méven Car
+Méven Car
+@meven
+8 hours ago
+Developer
+Suggested change 
+ * \since 6.32
+ * \since 6.33
