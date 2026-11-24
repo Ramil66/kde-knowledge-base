@@ -15,9 +15,18 @@ from sqlalchemy.engine import Connection
 from . import models as m
 from . import services as svc
 from .database import CatalogError, transaction
-from .importers import unique_fields
+from .import_stages import VERSION, Progress, analyze_mr
+from .importers import parse, unique_fields
+from .invent import Lines, SourceComment, hydrate
 from .lifecycle import now
-from .providers import GenerationRequest, LLMProvider, ProviderError, configured_provider, settings
+from .providers import (
+    GenerationRequest,
+    LLMProvider,
+    ProviderError,
+    Settings,
+    configured_provider,
+    settings,
+)
 from .schemas import Input, MergeRequest, Name, Repository, RepositoryURL, Task
 
 PROMPT_VERSION = "extract-1"
@@ -64,6 +73,9 @@ class PartialRepo(Repository):
 
 
 class MRProposal(Evidence):
+    source_comments: list[SourceComment] = Field(default_factory=list)
+    description_lines: Lines | None = None
+    links: list[str] = Field(default_factory=list)
     record: PartialMR
 
 
@@ -186,14 +198,80 @@ def inspect_document(
     dry_run: bool = False,
     refresh: bool = False,
     provider: LLMProvider | None = None,
+    no_llm: bool = False,
+    progress: Progress = lambda _: None,
 ) -> svc.Record:
     with transaction(path) as conn:
         document = svc.one(conn, m.raw_documents, id=uid)
         previous = latest_proposal(conn, uid)
-    if previous and not (dry_run or refresh):
-        return previous
-    proposal_type = model_for(document["document_type"])
+    fmt = document["format"]
+    structured = fmt in ("json", "yaml") or (
+        fmt == "markdown" and document["content"].splitlines()[:1] == ["---"]
+    )
+    is_page = document["document_type"] == "mr" and not structured
     config = settings()
+    offline = no_llm or (config.provider == "disabled" and provider is None)
+    if previous and not (dry_run or refresh):
+        upgrade_offline = (
+            is_page
+            and previous["model"] == "parser"
+            and not offline
+            and previous["proposal"].get("source_comments")
+        )
+        if not upgrade_offline:
+            progress(f"Document {uid}: cached preview; no model calls")
+            return previous
+    if structured:
+        record = parse(document["content"], fmt)
+        candidate = model_for(document["document_type"]).model_validate({"record": record})
+        data = {
+            "document_id": uid,
+            "proposal": candidate.model_dump(mode="json", exclude_unset=True, exclude_none=True),
+            "model": "parser",
+            "prompt_version": "structured-1",
+            "status": "pending",
+            "created_at": now(),
+        }
+    elif is_page:
+        proposal, metrics = analyze_mr(
+            path,
+            document,
+            config,
+            provider=provider,
+            offline=offline,
+            dry_run=dry_run,
+            progress=progress,
+        )
+        MRProposal.model_validate(proposal)
+        model = metrics.get("model", "parser")
+        data = {
+            "document_id": uid,
+            "proposal": proposal,
+            "model": model,
+            "prompt_version": VERSION,
+            "metrics": metrics,
+            "status": "pending",
+            "created_at": now(),
+        }
+        progress(
+            f"Model calls: {metrics['calls']}; input tokens: {metrics['input_tokens']}; output tokens: {metrics['output_tokens']}; estimated calls: {metrics['estimated_calls']}"
+        )
+    else:
+        if no_llm:
+            raise CatalogError(
+                "Original stored. Offline structured extraction accepts JSON, YAML or Markdown front matter."
+            )
+        data = generate_proposal(document, provider, config, progress)
+    if dry_run:
+        return data
+    return save_preview(path, uid, data, previous)
+
+
+def generate_proposal(
+    document: dict, provider: LLMProvider | None, config: Settings, progress: Progress
+) -> dict:
+    uid = document["id"]
+    proposal_type = model_for(document["document_type"])
     provider = provider or configured_provider(config)
     schema = proposal_type.model_json_schema()
     evidence = document["content"] + (
@@ -207,6 +285,7 @@ def inspect_document(
         ),
         schema,
         PROMPT_VERSION,
+        lambda n: progress(f"Generating: +{n} characters"),
     )
     for attempt in range(config.attempts):
         try:
@@ -236,8 +315,10 @@ def inspect_document(
         "status": "pending",
         "created_at": now(),
     }
-    if dry_run:
-        return data
+    return data
+
+
+def save_preview(path: Path, uid: int, data: dict, previous: dict | None) -> dict:
     with transaction(path, write=True) as conn:
         current = latest_proposal(conn, uid)
         if current != previous:
@@ -256,7 +337,7 @@ def inspect_document(
         return svc.one(conn, m.document_extractions, id=proposal_id)
 
 
-def confirm_document(path: Path, uid: int) -> svc.Record:
+def confirm_document(path: Path, uid: int, *, repo: str | None = None) -> svc.Record:
     with transaction(path, write=True) as conn:
         document = svc.one(conn, m.raw_documents, id=uid)
         preview = latest_proposal(conn, uid)
@@ -279,6 +360,14 @@ def confirm_document(path: Path, uid: int) -> svc.Record:
             repo_id = svc.store(conn, proposal.repository, source=source)
             svc.attach(conn, uid, m.repositories, repo_id)
         fields = proposal.record.model_dump(mode="json", exclude_none=True, exclude_unset=True)
+        if repo is not None:
+            if not isinstance(proposal, MRProposal) or fields.get("repo"):
+                raise CatalogError("--repo supplies a missing target repository for an MR")
+            fields["repo"] = svc.resolve_repo(conn, repo)["url"]
+        if isinstance(proposal, MRProposal):
+            hydrate(
+                fields, proposal.description_lines, proposal.source_comments, document["content"]
+            )
         if isinstance(proposal.record, MergeRequest) and proposal.repository:
             fields.setdefault("repo", proposal.repository.url)
         if len(linked) > 1:

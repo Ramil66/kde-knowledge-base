@@ -23,31 +23,23 @@ def catalog(tmp_path: Path, monkeypatch) -> Path:
 
 
 def test_review_raw_invent(catalog: Path) -> None:
-    content = "kio https://invent.kde.org/frameworks/kio\r\n!24 Fix errors\r\nopened\r\nfirst comment\r\nreply\r\n"
-    mr = {
-        "repo": "kio",
-        "external_id": 24,
-        "title": "Fix errors",
-        "status": "opened",
-        "discussions": [
-            {"comments": [{"body": "first comment"}, {"body": "reply", "parent_index": 0}]}
-        ],
-    }
-    proposal = {
-        "repository": {"name": "kio", "url": "https://invent.kde.org/frameworks/kio"},
-        "record": mr,
-    }
+    content = (
+        "!24 Fix errors\r\nopened\r\nActivity\r\nDev @dev commented yesterday\r\n"
+        "Resolved yesterday by Dev\r\nfirst comment\r\nAuthor @author replied yesterday\r\nreply\r\nReply…\r\n"
+    )
     with transaction(catalog, write=True) as conn:
-        uid = preserve_document(conn, "mr", "text", content)
-    model = MockProvider(json.dumps(proposal))
+        uid = preserve_document(
+            conn, "mr", "text", content, "https://invent.kde.org/frameworks/kio/-/merge_requests/24"
+        )
+    model = MockProvider('{"labels":[0,4]}')
     inspect_document(catalog, uid, provider=model, dry_run=True)
     with transaction(catalog) as conn:
-        assert not s.rows(conn, m.document_extractions)
+        assert not s.rows(conn, m.document_extractions) and not s.rows(conn, m.import_checkpoints)
         assert s.one(conn, m.raw_documents, id=uid)["content"] == content
-    model = MockProvider("invalid", json.dumps(proposal))
+    model = MockProvider("invalid", '{"labels":[0,4]}')
     preview = inspect_document(catalog, uid, provider=model)
     assert preview["status"] == "pending" and len(model.requests) == 2
-    assert json.loads(model.requests[0].document)["content"] == content
+    assert json.loads(model.requests[0].document) == ["first comment", "reply"]
     assert preview == inspect_document(catalog, uid, provider=MockProvider())
     with transaction(catalog) as conn:
         assert not s.rows(conn, m.merge_requests) and document_list(conn, True)
@@ -62,23 +54,26 @@ def test_review_raw_invent(catalog: Path) -> None:
         assert a["external_id"] is None and a["local_key"]
         assert b["parent_comment_id"] == a["id"]
         assert not document_list(conn, True)
-        assert preserve_document(conn, "mr", "text", content) == uid
+        assert (
+            preserve_document(
+                conn,
+                "mr",
+                "text",
+                content,
+                "https://invent.kde.org/frameworks/kio/-/merge_requests/24",
+            )
+            == uid
+        )
 
 
 def test_local_ids_and_partial_records(catalog: Path) -> None:
     for title in ("First", "Second"):
-        content = f"r {title} target"
+        content = f"{title}\nOpen\n{title}\ntopic into target\n"
         with transaction(catalog, write=True) as conn:
             s.store(conn, Repository(name="r", url="https://example.org/r"))
             uid = preserve_document(conn, "mr", "text", content)
-        inspect_document(
-            catalog,
-            uid,
-            provider=MockProvider(
-                json.dumps({"record": {"repo": "r", "title": title, "target_branch": "target"}})
-            ),
-        )
-        assert confirm_document(catalog, uid)["identity_origin"] == "local"
+        inspect_document(catalog, uid, no_llm=True)
+        assert confirm_document(catalog, uid, repo="r")["identity_origin"] == "local"
     with transaction(catalog) as conn:
         assert len(s.rows(conn, m.merge_requests)) == 2
         assert s.mr_detail(conn, "r", 2, local=True)["external_id"] is None
@@ -193,15 +188,20 @@ def test_chat_protocol_and_transport_failure(
                 {"role": "user", "content": "original"},
             ]
             if endpoint == "/api/chat":
-                assert payload["format"] == prompt.schema and payload["stream"] is False
+                assert payload["format"] == prompt.schema and payload["stream"] is True
                 assert request.get_header("Authorization") is None
-                return BytesIO(b'{"message":{"content":"{}"}}')
+                return BytesIO(
+                    b'{"message":{"content":"{"},"done":false}\n{"message":{"content":"}"},"done":true,"eval_count":2,"prompt_eval_count":10}\n'
+                )
             assert request.get_header("Authorization") == "Bearer test-token"
-            return BytesIO(b'{"choices":[{"message":{"content":"{}"}}]}')
+            return BytesIO(
+                b'data: {"choices":[{"delta":{"content":"{}"}}]}\n\ndata: {"choices":[],"usage":{"prompt_tokens":10,"completion_tokens":2}}\n\ndata: [DONE]\n\n'
+            )
 
     monkeypatch.setattr(providers, "build_opener", lambda *_: Transport())
     provider = providers.configured_provider(config)
-    assert provider.generate(prompt).content == "{}"
+    generated = provider.generate(prompt)
+    assert (generated.content, generated.input_tokens, generated.output_tokens) == ("{}", 10, 2)
     assert seen[0].full_url == "http://example.test" + endpoint
 
     def unavailable(*args, **kwargs):

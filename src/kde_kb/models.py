@@ -382,6 +382,16 @@ document_extractions = Table(
     string("model", required=True),
     string("prompt_version", required=True),
     Column("proposal", JSON, nullable=False),
+    Column("metrics", JSON),
     string("status", required=True),
     string("created_at", required=True),
+)
+
+import_checkpoints = Table(
+    "import_checkpoints",
+    metadata,
+    Column("cache_key", Text, primary_key=True),
+    fk("document_id", "raw_documents", cascade=True),
+    string("stage", required=True),
+    Column("result", JSON, nullable=False),
 )

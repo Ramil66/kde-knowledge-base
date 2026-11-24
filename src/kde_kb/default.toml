@@ -5,6 +5,9 @@ model = "qwen3:4b-instruct-2507-q4_K_M"
 temperature = 0
 timeout = 120
 attempts = 2
+num_ctx = 2048
+num_predict = 64
+block_size = 1024
 
 [embeddings]
 provider = "ollama"

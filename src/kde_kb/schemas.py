@@ -165,6 +165,7 @@ class Position(Input):
 
 
 class Comment(Input):
+    category: Name | None = None
     external_id: Name | None = None
     parent_index: Annotated[int, Field(ge=0)] | None = None
     body: str

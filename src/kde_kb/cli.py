@@ -7,6 +7,7 @@ from dataclasses import asdict
 from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
+from time import monotonic
 from typing import Annotated, Any, cast
 
 import typer
@@ -356,6 +357,20 @@ class FileFormat(StrEnum):
     diff = "diff"
 
 
+def import_progress() -> Callable[[str], None]:
+    last = 0.0
+
+    def report(message: str) -> None:
+        nonlocal last
+        current = monotonic()
+        if "characters" in message and current - last < 0.5:
+            return
+        typer.echo(message, err=True)
+        last = current
+
+    return report
+
+
 def import_command(kind: Kind) -> Callable[..., None]:
     def run(
         ctx: typer.Context,
@@ -363,6 +378,7 @@ def import_command(kind: Kind) -> Callable[..., None]:
         stdin: bool = False,
         fmt: Annotated[FileFormat | None, typer.Option("--format")] = None,
         extract: bool = False,
+        no_llm: bool = False,
         source_url: str | None = None,
     ) -> None:
         """Import a UTF-8 file or pasted text from stdin."""
@@ -373,11 +389,11 @@ def import_command(kind: Kind) -> Callable[..., None]:
         )
         filename = file.name if file is not None else None
         file_format = cast(Format, fmt.value) if fmt else detect_format(filename, kind, content)
-        if extract:
+        if extract or no_llm:
             with transaction(ctx.obj, write=True) as conn:
                 uid = preserve_document(conn, kind, file_format, content, source_url, filename)
             typer.echo(f"Original document: {uid}", err=True)
-            output(inspect_document(ctx.obj, uid))
+            output(inspect_document(ctx.obj, uid, no_llm=no_llm, progress=import_progress()))
             return
         with transaction(ctx.obj, write=True) as conn:
             result = import_document(conn, kind, file_format, content, source_url, filename)
@@ -409,13 +425,24 @@ def extract_document(
     dry_run: bool = False,
     confirm: bool = False,
     refresh: bool = False,
+    no_llm: bool = False,
+    repo: str | None = None,
 ) -> None:
+    if repo and not confirm:
+        raise CatalogError("--repo requires --confirm")
     if confirm and (dry_run or refresh):
         raise CatalogError("Use --confirm on its own to apply the saved proposal")
     output(
-        confirm_document(ctx.obj, document_id)
+        confirm_document(ctx.obj, document_id, repo=repo)
         if confirm
-        else inspect_document(ctx.obj, document_id, dry_run=dry_run, refresh=refresh)
+        else inspect_document(
+            ctx.obj,
+            document_id,
+            dry_run=dry_run,
+            refresh=refresh,
+            no_llm=no_llm,
+            progress=import_progress(),
+        )
     )
 
 
