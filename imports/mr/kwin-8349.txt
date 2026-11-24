@@ -1,0 +1,183 @@
+URL: https://invent.kde.org/plasma/kwin/-/merge_requests/8349
+COPIED: 25.11.26
+
+--- OVERVIEW ---
+
+Add optional showNumbers parameter to show()
+Closed
+Ramil Nurmanovrequested to merge ramilnur/kwin:feature/kscreen-shownumbers-kwin into master
+Nov 2, 2025
+Overview 8
+Commits 3
+
+Add an optional boolean parameter 'showNumbers' (default: false) to the show() function in OutputLocatorEffect. If showNumbers is true, the OSD displays the display index instead of the output name. The indexing algorithm is borrowed from KScreen for consistency. This update is primarily intended to support enhanced functionality in KScreen, allowing it to request numbered displays via DBus.
+
+The numbering algorithm is based on connector names (e.g., HDMI-1, DP-1) and is calculated identically in both KWin and KScreen, ensuring the same order and consistency between the OSD overlays and KCM UI without additional synchronization.
+No API break: Existing callers of show() without parameters retain the original behavior.
+Related KScreen MR:  kscreen!432 (closed)
+Fixes: https://bugs.kde.org/show_bug.cgi?id=481061
+Related: https://bugs.kde.org/show_bug.cgi?id=466046
+Related: https://bugs.kde.org/show_bug.cgi?id=450344
+
+--- ACTIVITY ---
+
+Activity
+Ramil Nurmanov mentioned in merge request kscreen!431 (closed) Nov 2, 2025
+Vlad Zahorodnii
+Vlad Zahorodnii
+@vladz
+Nov 3, 2025
+Developer
+I don't think it's a good idea to show numbers. Outputs can be stored in a different order in kwin and kscreen. Connector names are short and are consistent regardless how outputs are announced.
+
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+Nov 8, 2025
+Author
+Contributor
+Connector names are short but differ. The display numbering uses the same name-based sorting algorithm in both KWin and KScreen, so the order is consistent.
+
+Méven Car
+Méven Car
+@meven
+11 months ago
+Developer
+Outputs can be stored in a different order in kwin and kscreen.
+
+The number ordering is made consistent with kscreen with kscreen!432 (closed)
+
+Connector names are short and are consistent regardless how outputs are announced.
+
+And can't really be exposed to users. Preventing the user to have a good understanding of the setup. We tried that.
+
+Numbers are much simpler for users to understand and familiar ( Windows does this IIRC).
+
+https://bugsfiles.kde.org/attachment.cgi?id=165670 is pretty pathological but should be a somewhat common situation.
+
+Edited 11 months ago by Méven Car
+Vlad Zahorodnii
+Vlad Zahorodnii
+@vladz
+11 months ago
+Developer
+The number ordering is made consistent with kscreen with kscreen!432 (closed)
+
+Unless these indices are provided by kwin, i.e. that there is only one source of information, this can't work reliably in long term.
+
+It's true that the output locator output is somewhat overwhelming with all the information provided but effectively adding another output id on top of other existing ones will be just too much. It'll make things even messier than they already are. I'm not in favor of this change, sorry.
+
+Méven Car
+Méven Car
+@meven
+11 months ago
+Developer
+Unless these indices are provided by kwin, i.e. that there is only one source of information, this can't work reliably in long term.
+
+We have kde-outputdevice protocol for this kind of consistency solving https://invent.kde.org/libraries/plasma-wayland-protocols/-/blob/master/src/protocols/kde-output-device-v2.xml?ref_type=heads
+
+Or https://invent.kde.org/libraries/plasma-wayland-protocols/-/blob/master/src/protocols/kde-output-order-v1.xml?ref_type=heads
+
+I think this should be the default, used only in the screen-layout and screen identification.
+
+Edited 11 months ago by Méven Car
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+11 months ago
+Author
+Contributor
+Got it, thanks for the explanation.
+
+I agree this should rely on a compositor-provided order rather than re-computing it in the effect.
+
+I’m happy to rework this, but could you clarify what the preferred source of truth should be for Output Locator - kde-output-order-v1, output-device priority, or an internal KWin API?
+
+Once that’s clear, I’ll adjust the patch accordingly.
+
+Reply…
+Vlad Zahorodnii requested changes Nov 3, 2025
+Ramil Nurmanov mentioned in commit ramilnur/kscreen@196e6f61 Nov 3, 2025
+Ramil Nurmanov mentioned in merge request kscreen!432 (closed) Nov 3, 2025
+Ramil Nurmanov resolved all threads Nov 8, 2025
+Ramil Nurmanov added 253 commits 11 months ago
+9da10990...1b4896c2 - 252 commits from branch plasma:master
+613a2f38 - Merge branch kwin:master into feature/kscreen-shownumbers-kwin
+Compare with previous version
+
+Ramil Nurmanov changed the description 11 months ago
+Ramil Nurmanov added 2 commits 11 months ago
+01bb37b5 - Add optional showNumbers parameter to show()
+fa7bf66d - outputlocator: Fix label alignment and width for numbered outputs
+Compare with previous version
+
+Ramil Nurmanov mentioned in commit ramilnur/kscreen@04f462d8 11 months ago
+Ramil Nurmanov changed the description 11 months ago
+Méven Car
+Méven Car @meven started a thread on an old version of the diff 11 months ago
+Resolved 11 months ago by Méven Car
+src/plugins/outputlocator/outputlocator.cpp 
+
+    const auto screens = effects->screens();
+    for (const auto screen : screens) {
+        QString name = QString();
+        if (!showNumbers) {
+            name = outputName(screen);
+        } else {
+            //The algorithm sorts by connector name, like indexByConnector in KScreen.
+            int index = 1;
+            for (const auto other : screens) {
+                if (screen == other)
+                    continue;
+
+                if (QString::compare(other->name(), screen->name(), Qt::CaseInsensitive) < 0)
+Méven Car
+Méven Car
+@meven
+11 months ago
+Developer
+Use std::sort algorithm
+
+Ramil Nurmanov
+changed this line in version 4 of the diff 11 months ago 
+Reply…
+Ramil Nurmanov mentioned in commit ramilnur/kscreen@e36d6547 11 months ago
+Ramil Nurmanov added 1 commit 11 months ago
+143f8812 - kwin/outputlocator: Use std::sort for consistent monitor numbering in show()
+Compare with previous version
+
+Ramil Nurmanov added 1 commit 11 months ago
+bd9e6b63 - kwin/outputlocator: Use std::sort for consistent monitor numbering in show()
+Compare with previous version
+
+Ramil Nurmanov mentioned in commit ramilnur/kscreen@24e5f245 10 months ago
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+7 months ago
+Author
+Contributor
+superseded by !9090 (merged)
+
+Ramil Nurmanov closed 7 months ago
+Sergey Katunin mentioned in merge request !9090 (merged) 7 months ago
+
+
+--- COMMITS ---
+
+Commits:
+
+Dec 23, 2025
+Ramil Nurmanov's
+kwin/outputlocator: Use std::sort for consistent monitor numbering in show()
+Ramil Nurmanov authored 11 months ago
+bd9e6b63
+Dec 08, 2025
+Ramil Nurmanov's
+outputlocator: Fix label alignment and width for numbered outputs 
+Ramil Nurmanov authored 11 months ago
+fa7bf66d
+Ramil Nurmanov's
+Add optional showNumbers parameter to show() 
+Ramil Nurmanov authored Nov 2, 2025
+01bb37b5

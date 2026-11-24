@@ -1,0 +1,2338 @@
+URL: https://invent.kde.org/plasma/plasma-workspace/-/merge_requests/6958
+COPIED: 2026-11-25
+
+--- OVERVIEW ---
+
+systemtray: allow manually reordering icons
+Open
+Ramil Nurmanovrequested to merge
+ ramilnur/plasma-workspace:feature/system-tray-icon-order
+into
+master
+3 months ago
+Overview 
+176
+Commits 
+40
+Pipelines 
+49
+Reports 
+2
+Changes 
+18
+All threads resolved!
+Allow System Tray icons to be manually reordered from the Entries configuration page using drag-and-drop.
+
+The custom order is saved and applied to the System Tray. A "Restore default order" action is also provided to return to the automatic ordering.
+
+
+Depends on frameworks/kirigami!2156 (merged)
+
+BUG: 384782
+
+Edited 2 months ago by Ramil Nurmanov
+
+--- ACTIVITY ---
+
+Activity
+Nate Graham
+Nate Graham
+@ngraham
+3 months ago
+Developer
+Resolved 2 months ago by Ramil Nurmanov
+It would appear one of the costs of this change is losing grouping in the config window. I don't love that, TBH.
+
+Nate Graham
+Nate Graham
+@ngraham
+3 months ago
+Developer
+It may be a trade-off we need to make, though. I like how you've tried to preserve the essence of the groups by mentioning them in each item's subtitle… but I wonder if it's worth it.
+
+Because now that these icons are no longer grouped into logical sections separated with headers, the list no longer has any real structure and it's harder to navigate, and seeing the categories repeated dozens of times becomes visual noise rather than a navigation aid.
+
+So I'm not sure what value the categories are adding anymore. Maybe with this work, we need to give up on the grouping/categorization idea entirely.
+
+cc @teams/usability
+
+Nate Graham
+Nate Graham
+@ngraham
+3 months ago
+Developer
+But on the other hand if we remove de facto grouping into categories, then the initial ordering will look pretty random.
+
+Grant Gryczan
+Grant Gryczan
+@grantgryczan
+3 months ago
+I think arbitrary ordering by default is fine, personally. It always felt arbitrary to me anyway, and I've always wanted to rearrange them without regard for categories.
+
+Kristen McWilliam
+Kristen McWilliam
+@merritt
+3 months ago
+Developer
+Could be that default ordering still has category grouping, and as soon as you customize the ordering there is no longer such grouping?
+
+Marco Santana
+Marco Santana
+@dumbinacan
+3 months ago
+I don't know if it is worth the trouble, but grouping could also be customizable. Default groups look like the current grouping does, but you let the user add, edit, and merge groups (or maybe just toggle groups on or off). Editing groups could involve creating rules similar to the ones that created the existing groups or just be manually organized. Then the user could order things in the group and then order the groups themselves.
+
+If you know no matter how often you change the order of your icons that you want certain icons to be together, you gain a lot of value from the groups not being removed. More than anything though, I am just excited to be able to reorder my system tray icons in general.
+
+Tem PQD
+Tem PQD
+@tempqd
+3 months ago
+For me, the structure (alphabetical, but not really, because categories) was always pretty hard to parse and navigate TBH. I think a long monolithic list might not be the easiest either, but yeah I think the categories are simply noise now and not useful, so I agree to kill them (or just hide for now in case they're used for something again in the future?)
+
+Initial ordering can just be alphabetical, with or without categories either seems fine to me. When a new entry is added, can simply add onto the end (can't guarantee the rest are still in alphabetical order after first boot).
+
+Tem PQD
+Tem PQD
+@tempqd
+3 months ago
+I suppose the "Restore default order" button comes into this question here too. We could kill it, change to "Sort in alphabetical order", or leave it as effectively a 'go back to how it used to be ordered for years before this update' button.
+
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+3 months ago
+Author
+Contributor
+From the discussion so far, I think we have a few main options:
+
+Remove categories completely.
+Keep categories only for the default order, then switch to a custom order after reordering.
+Keep categories as labels without actual grouping.
+Keep real groups and allow reordering inside them.
+Make the groups themselves configurable.
+My preferred option would be to keep categories by default. Entries could be reordered freely inside a category, and the categories themselves could also be reordered.
+
+If an entry is moved between categories, the grouping could disappear and the list would become fully custom. The tricky part is making that transition feel understandable.
+
+Another option would be to make it explicit with a button at the top that switches between grouped and simple/custom ordering instead of changing automatically.
+
+Nate Graham
+Nate Graham
+@ngraham
+2 months ago
+Developer
+If we want to keep the groups by default, I would recommend adding a switch in the UI that turns on re-orderability. When that's turned on, the groups disappear. Then the connection would be obvious.
+
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+2 months ago
+Author
+Contributor
+I have implemented the approach you proposed. The labels on the switch are just for example for now; we will change it if necessary.
+
+
+Is this option acceptable?
+
+Nate Graham
+Nate Graham
+@ngraham
+2 months ago
+Developer
+Yeah, that's what I had in mind.
+
+What does everyone else think?
+
+Grant Gryczan
+Grant Gryczan
+@grantgryczan
+2 months ago
+I like it, but I think it would make more sense as a drop-down so that users don't have to activate something in order to see what the other options are.
+
+Jin Liu
+Jin Liu
+@genericity
+2 months ago
+Developer
+How about having a separate page for ordering? It doesn't even need to be a list. Maybe a systray preview where you can actually drag icons around?
+
+I found the grouping quite useful for an already very long list of tray icons.
+
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+2 months ago
+Author
+Contributor
+Thanks! This is roughly the final version of the ordering UI and behavior
+
+
+Tem PQD
+Tem PQD
+@tempqd
+2 months ago
+Oh, very cool! As long as the Qt experts consider it not too complex/difficult to maintain, I'm happy with this UX.
+
+Maybe the button string could communicate that it's alphabetical order in some way, like "Alphabetically by category" or something?
+
+Marco Martin
+Marco Martin
+@mart
+2 months ago
+Developer
+fwiw Listview grouping ahould still work with reordered items, it might look weird since it would repeat sections, but would do like
+
+Section1
+ item1
+ item2
+Section2
+ item3
+ item4
+moving up item3 would become
+
+Section1
+ item1
+Section2
+ item3
+Section1
+ item2
+Section2
+ item4
+which, might seem a bit silly but imo makes more sense than what it seems
+
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+2 months ago
+Author
+Contributor
+I've updated the System Tray. Here's a video of the current result
+
+
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+2 months ago
+Author
+Contributor
+Since there haven't been any further comments on the latest version for a few weeks, I'll consider this discussion resolved.
+
+Reply…
+Nate Graham
+Nate Graham
+@ngraham
+3 months ago
+Developer
+Resolved 2 months ago by Nate Graham
+"Notifications" is classified as a system service, but when I reset to the default order, it's always at the bottom of the list, rather than grouped.
+
+I know I mentioned getting rid of the groups/categories in !6958 (comment 1585200), but while they're still here, everything should use them properly! 😁
+
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+3 months ago
+Author
+Contributor
+Fixed. Notifications is now ordered according to its System Services category when restoring the default order
+
+Reply…
+Nate Graham
+Nate Graham
+@ngraham
+3 months ago
+Developer
+Resolved 2 months ago by Nate Graham
+I have a slight UX concern. The re-ordering UI uses a list, but the popup contains a two-column grid view, not a list. As a result, re-ordering things in the list can produce somewhat unintuitive movements in the grid:
+
+
+The only two options for improving this that I can think of require even more invasive work, though:
+
+Go back to a list view in the popup (cutting information density in half)
+Allow re-ordering with direct manipulation drag-and-drop on the items themselves (which I imagine will be a complete nightmare to implement)
+Any thoughts?
+
+Grant Gryczan
+Grant Gryczan
+@grantgryczan
+3 months ago
+I can't speak for everyone, but as someone with some experience in UX design, I don't think this is that unintuitive personally. Reordering by dragging and dropping directly would be much more ideal, but that can be reserved as future work. This is a perfectly fine starting point IMO.
+
+Edited 3 months ago by Grant Gryczan
+Nate Graham
+Nate Graham
+@ngraham
+3 months ago
+Developer
+It may be that your experience in UX design makes you (and me as well!) less qualified lol. We think in terms of grids and indices and mapping thing X to thing Y… I think a normal person is much less likely to have that mental plumbing.
+
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+3 months ago
+Author
+Contributor
+In addition to the proposed option in this MR, I also have a prototype for organizing icons directly in the tray itself, but, as explained in BUG: 384782, there may be issues with dynamic or hidden elements, and I think it’s worth putting this on hold for now
+
+
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+3 months ago
+Author
+Contributor
+But, in my opinion, this behavior is intuitive: when I change the order, it changes correctly in the pop‑up window. That is, the order of elements in the pop‑up window is numbered from left to right and from top to bottom. If you move an element to position N in the list, it will always end up in the same place in the grid.
+
+Regarding direct drag-and-drop in the pop‑up window, I don’t think it will be that difficult, given that the grid consists of two fixed columns, so it will mostly be a matter of dragging and swapping with the cell under the cursor, rather than a full‑fledged reorganization system. I think drag-and-drop in the grid can be implemented later.
+
+Tem PQD
+Tem PQD
+@tempqd
+3 months ago
+Ah, I do agree with Nate that it does look a bit odd.
+
+What if the movement was animated like in other list/grid views (e.g. deleting/adding item in Dolphin)? That would clarify it I think.
+
+If not, maybe we could remove the text labels and just have an icon grid -- with more items per row it might be easier to see that it's simply left-to-right order.
+
+Tem PQD
+Tem PQD
+@tempqd
+3 months ago
+I also have a prototype for organizing icons directly in the tray itself
+
+Nice! However, to be honest, I personally think making the tray icons themselves draggable is not a good idea.
+
+I can't imagine the desire to change their order occurs frequently at all, and I think 99% of drags will be accidental (due to tiny click targets way in the bottom corner plus tiny drag distance, rearranging is too easy) and just frustrating. At the very least it should be an option IMO.
+
+If there indeed are issues with "shown when relevant" icons etc, then all the more reason.
+
+Niccolò Venerandi
+Niccolò Venerandi
+@niccolove
+3 months ago
+Developer
+I really don't want to bikeshed this MR as I love to see this finally implemented, but on the long term I'd really love if we could make the tray icon drag-and-droppable from edit mode. I think it's how the user wound expect it to work: since they can drag everything when in edit mode within the panel, they might reasonably believe they can drag and drop the tray icons too. And, since we're in edit mode, we could temporary show hidden icons as grayed out to avoid the mentioned issue. This should almost be feasible: applets can see that they are in edit mode and change their behavior and look based on that, but currently the panel disallows all interactions with applets in edit mode. Maybe applets could ask to be still interactive so that they can expose their own edit mode behavior? That requires an API change though.
+
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+3 months ago
+Author
+Contributor
+make the tray icon drag-and-droppable from edit mode
+
+I really like this idea! It was actually one of the approaches I considered before starting this MR, and I'd be happy to work on it.
+
+Would you prefer to see this implemented as part of this MR, or should it be kept as follow-up work in a separate MR, especially since it may require an API change?
+
+Niccolò Venerandi
+Niccolò Venerandi
+@niccolove
+3 months ago
+Developer
+IMO Ideally within this MR so that we don't introduce a chance (draggable list) to then revert it later; but if you preferred to first get this MR done I'd understand it :-)
+
+Tem PQD
+Tem PQD
+@tempqd
+3 months ago
+Oh wow, great idea! I don't see any downsides to that method. As long as there's still some way for the widget itself to be dragged, in addition to the icons.
+
+Nicolas Fella
+Nicolas Fella
+@nicolasfella
+3 months ago
+Developer
+I'd really love if we could make the tray icon drag-and-droppable from edit mode
+
+Let's not make it more complex than needed please. I'm already not convinced that this is worth all the complexity and maintainability issues it brings
+
+Grant Gryczan
+Grant Gryczan
+@grantgryczan
+3 months ago
+I agree that drag and drop from edit mode would be excellent. It's much less cumbersome than rearranging things across a very tall scrollable area, and it addresses the potential accessibility issue with accidental rearrangement. I don't think features that improve UX should be blocked by complexity concerns in the long term, as I believe such concerns can eventually be designed away, and I'd argue UX takes priority. Drag and drop across scrolling can be very frustrating and tedious. But it is understandable if that should be reserved for future work.
+
+Edited 3 months ago by Grant Gryczan
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+2 months ago
+Author
+Contributor
+Since it seems there is no consensus, perhaps we should stick to a simpler option for now: return the pop‑up window to list mode so that the order of elements in it matches the order on the “Records” page. Then I can study the drag‑and‑drop function in edit mode separately in the next change request without complicating the process here.. What do you think?
+
+Nate Graham
+Nate Graham
+@ngraham
+2 months ago
+Developer
+I'm against returning to a flat list; it's got worse information density compared to what we have right now.
+
+It's okay to say "yeah, it's awkward for re-ordering to be one-dimensional while the UI itself is two-dimensional, but we don't have a realistic way of improving on that." if that's your position. :)
+
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+2 months ago
+Author
+Contributor
+Okay, then i'll keep the current grid layout
+
+Reply…
+Nate Graham added 
+Feature
+ 
+Noteworthy
+ labels 3 months ago
+Nate Graham changed milestone to %6.8 3 months ago
+Ramil Nurmanov added 1 commit 3 months ago
+2cc613a7 - systemtray: Respect categories when resetting icon order
+Compare with previous version
+
+Fady Awny
+Fady Awny
+@fady
+3 months ago
+Resolved 2 months ago by Fady Awny
+The configuration menu does not play nice with apps that got added to the system tray while the menu was open,
+
+here is an example:
+
+image.png
+
+This weird entry is supposedly Vesktop; as it was the only new one added.
+
+Let me change the order of something.
+
+image.png
+
+Now for some reason Vesktop is on the other side of the the tray.
+
+Let me return the order to normal manually.
+
+image.png
+
+that didn't work, let me press the "Restore default order" then.
+
+image.png
+
+that worked but now my icons are the default order, now all of this doesn't happen if such an app was opened while the menu was not open, or if the menu was closed and reopened, but I thought this would be worth pointing out.
+
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+3 months ago
+Author
+Contributor
+Thanks for catching this!
+
+Newly added can initially appear in the model before their item ID and other data are populated. The ordering model was copying them too early, leaving an entry with an empty ID.
+
+I've fixed this by waiting for a valid ID, updating the ordering model
+
+Fady Awny
+Fady Awny
+@fady
+3 months ago
+I noticed new entries are still getting added to the wrong side of the tray unless using the "default order".
+
+Fady Awny
+Fady Awny
+@fady
+3 months ago
+and when they are given a new position to be in, they get added like this.
+
+
+Edited 3 months ago by Fady Awny
+Fady Awny
+Fady Awny
+@fady
+3 months ago
+And if the order of anything is changed in any way (except pressing "Restore default order"), they go back to getting added to the wrong side.
+
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+3 months ago
+Author
+Contributor
+Fixed. New entries now fall back to the default category sorting instead of always being placed after the custom-ordered entries.
+
+Fady Awny
+Fady Awny
+@fady
+3 months ago
+Good work! That should resolve it.
+
+Fady Awny
+Fady Awny
+@fady
+2 months ago
+Icons are still being added in a weird way, with the tray making space for the new icon in the wrong place for less than a second.
+
+Screencast_20260903_212622.webm
+
+This was done by using LTR ordering and placing Vesktop as the last entry in the list.
+
+Is this going to be fixed in this MR or let go for later?
+
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+2 months ago
+Author
+Contributor
+I tested this locally with several apps, including Vesktop, and I can't reproduce. New icons appear directly in their final position without the brief jump shown in the video. If you can still reproduce it, please share the exact steps and I'll take another look.
+
+Fady Awny
+Fady Awny
+@fady
+2 months ago
+Well like I said, use LTR and put the target app at the end of the list, you can also just put a widget to the left of the system tray instead of using LTR, I tested this with different apps just to be sure it's not app specific or anything and I am using the latest commit dfacfedf.
+
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+2 months ago
+Author
+Contributor
+I managed to reproduce this and traced it to the SNI being inserted before its initial ID was available. I've pushed a fix that delays the insertion until that data arrives. Could you check if it fixes the case you were seeing as well?
+
+Fady Awny
+Fady Awny
+@fady
+2 months ago
+9b0b15ce does the job perfectly!
+
+Reply…
+Fady Awny
+Fady Awny
+@fady
+3 months ago
+Resolved 3 months ago by Fady Awny
+I want to also point out that 2 instances of the same app cannot be separated or moved at all using the GUI.
+
+image.png
+
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+3 months ago
+Author
+Contributor
+I encountered another problem: when two instances of the same application were added during an open settings dialog, only one of them could be displayed in the settings list. This happened because the SNI identifier defines the application, not a specific instance, so both entries could have the same identifier.
+
+In the end, I decided to add a separate stable key for the menu to distinguish between active instances, and I left the itemId for ordering. I also adjusted the sorting in C++.
+
+Since this had a slight impact on the logic, I added regression tests for both regular user sorting and for duplicate identifiers.
+
+What do you think about this solution? It seemed the most logical to me.
+
+Fady Awny
+Fady Awny
+@fady
+3 months ago
+I think this makes the most sense to me.
+
+Reply…
+Ramil Nurmanov added 1 commit 3 months ago
+3e314f7f - systemtray: Handle items added while settings are open
+Compare with previous version
+
+Ramil Nurmanov added 1 commit 3 months ago
+a4fa5d17 - systemtray: Fix ordering of duplicate tray items
+Compare with previous version
+
+Fady Awny
+Fady Awny
+@fady
+3 months ago
+Resolved 2 months ago by Fady Awny
+The "cursor" is getting confused between 2 very specific entries on which one it's holding while it scrolls.
+
+The speed and method of scrolling doesn't seem to affect this.
+
+
+Tem PQD
+Tem PQD
+@tempqd
+3 months ago
+Is this a pre-existing issue for all users of ListItemDragHandle though?
+
+Fady Awny
+Fady Awny
+@fady
+3 months ago
+To be honest, I haven't checked.
+
+Also about "method of scrolling doesn't seem to affect this", I checked again and no, turns out just scrolling with the mouse wheel gives this weird bug.
+
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+3 months ago
+Author
+Contributor
+I looked into this further and found two possible fixes.
+
+The simple one is to disable delegate reuse and use cacheBuffer: contentHeight. I tested it and it fixes the scrolling issue, and the Entries list is small enough that the cost should be negligible.
+
+The more robust option would be to rework the dragging logic so it doesn't depend on the lifetime of the ListView delegate, but that would be a considerably larger change.
+
+Which approach would you prefer for this MR?
+
+Fady Awny
+Fady Awny
+@fady
+3 months ago
+I guess the first option is good enough, I have not seen a scenario where thousands of entries or more are in the list, even if such scenarios exists, I'm guessing the performance drop would be from how many apps are open rather than the list itself, and that is if the device doesn't get an OOM killer.
+
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+3 months ago
+Author
+Contributor
+Sounds good, thanks! I've gone with the first approach.
+
+Reply…
+Tem PQD
+Tem PQD
+@tempqd
+3 months ago
+Ah, I attempted to implement this before (when this code was more fragile) and wasn't successful. Thank you very much for working through it! I put a lot of thought into how this feature could work, and this is close to my ideas (here) and past attempt, but I do have some suggestions
+
+Tem PQD
+Tem PQD
+@tempqd
+3 months ago
+Resolved 2 months ago by Ramil Nurmanov
+While dragging an entry and whenever the tray icons get rearranged, can all the other entries' and icons' movement be animated with standard InOutCubic(or whichever one it is) curve?
+
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+3 months ago
+Author
+Contributor
+Thanks for the suggestion! I changed the reordering animation to use InOutCubic, which makes the movement feel smoother and more consistent with other KDE list/grid animations.
+
+Tem PQD
+Tem PQD
+@tempqd
+3 months ago
+Very nice! (If I'm misremembering and it should actually be InOutQuad or something else, others can chime in)
+
+Tem PQD
+Tem PQD
+@tempqd
+2 months ago
+Hmm, in the latest screen recording of the Entries settings page, it looks like the animation is on the entry being dragged. I meant for the animation to be on all the other entries. Does that make sense?
+
+I think the one being dragged can stay stuck to the pointer, or if possible only applied if the up/down keyboard control is pressed.
+
+Is that doable? (either here or in ListItemDragHandle itself)
+
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+2 months ago
+Author
+Contributor
+In the Entries list, displaced items already use InOutCubic. The animation on the dragged item itself comes from Kirigami.ListItemDragHandle, so changing that would be a separate Kirigami change.
+
+The live tray is harder, because its reordering comes through QSortFilterProxyModel::layoutChanged, so QML move transitions don't run there without a bigger model-level change.
+
+Did you mean the Entries list, the live tray, or both? And for the Entries list, is the current displaced-item animation enough, or should the keyboard-moved item animate too?
+
+Tem PQD
+Tem PQD
+@tempqd
+2 months ago
+Hmm, based on the video it seems instant, but if you do see InOutCubic working in Entries list then great. Yes, I think only the displaced entries should animate in mouse mode, and all entries should animate in keyboard mode.
+
+As for the dragged item itself I'll open thread in other MR.
+
+For live tray, I couldn't remember but if it's indeed not simple then I think we can leave it for future work (we can make bug report or gitlab issue to not forget) unless others object.
+
+Reply…
+Tem PQD
+Tem PQD
+@tempqd
+3 months ago
+Resolved 2 months ago by Ramil Nurmanov
+Did anyone check that the search filter plays nicely with dragging? Back when I tried my implementation I couldn't get it to work properly (and I can't test this MR myself atm).
+
+Fady Awny
+Fady Awny
+@fady
+3 months ago
+If you're asking about changing the order while something is typed in the search bar, that's actually disabled.
+
+Reply…
+Tem PQD
+Tem PQD
+@tempqd
+3 months ago
+Resolved 2 months ago by Ramil Nurmanov
+Is rearranging easy for keyboard-only users? If not, maybe up/down arrow buttons could help with accessibility?
+
+Fady Awny
+Fady Awny
+@fady
+3 months ago
+As of a4fa5d17, using the keyboard isn't supported, but it's certainly a good idea.
+
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+3 months ago
+Author
+Contributor
+I added Move up/down buttons as a keyboard-accessible alternative to drag-and-drop. Is this what you had in mind?
+
+79.png
+
+Tem PQD
+Tem PQD
+@tempqd
+3 months ago
+I actually like this better than what I had in mind :)
+
+There's some inconsistency with other places (e.g. Keyboard kcm) but we can choose a standard, including focus order
+
+One thing: if you press enter on e.g. Trashcan up arrow, and it moves up an entry, is the keyboard still focused on the same button? It should be spammable to move one entry up many spots, otherwise it'll just swap back and forth.
+
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+3 months ago
+Author
+Contributor
+Thank you for the note! Now the same button retains focus after moving the element, so you can click it multiple times to move the element to several positions.
+
+Fady Awny
+Fady Awny
+@fady
+3 months ago
+I am a little worried about the UX of this, since I think most people would intuitively press Enter when they reach the arrows (myself included :)) but that closes the menu, and the correct button is actually Space.
+
+Also spamming the button isn't so great, since if I want to spam an entry to the top or bottom of the list, I get surprised that because now that button is unavailable to press/focus on, I get switched to the opposite button, which undoes what I want.
+
+Not sure how this can be avoided though.
+
+Fady Awny
+Fady Awny
+@fady
+3 months ago
+There is also a bit of a cool down to pressing the button, so I guess no one can really "spam" the buttons.
+
+Niccolò Venerandi
+Niccolò Venerandi
+@niccolove
+3 months ago
+Developer
+I'm have some worries about this arrows: their existence is not task manager specific, so either we want them but we want them for all draggable lists, meaning they should be implemented as a reusable control, or we don't want them in general and not here too; there's nothing specifically about this draggable list that justifies a different behavior than general, and it goes beyond the scope of this MR imo. Furthermore, I think having two different controls to take the same action, reordering the list, can be too busy and confusing for the UX. I'd prefer to make sure the draggable list view component has good keyboard controls.
+
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+2 months ago
+Author
+Contributor
+Makes sense. I've removed the separate buttons and made the drag handle keyboard-focusable instead. Up/Down now reorder the focused entry, keeping keyboard support without adding extra visual controls.
+
+
+Nate Graham
+Nate Graham
+@ngraham
+2 months ago
+Developer
+This works well.
+
+Is it something that could be contributed to Kirigami.ListItemDragHandle itself?
+
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+2 months ago
+Author
+Contributor
+Yes. I'll look into implementing this directly in Kirigami.ListItemDragHandle, likely as a separate Kirigami MR, and then this MR could simply use that behavior
+
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+2 months ago
+Author
+Contributor
+I’ve opened frameworks/kirigami!2156 (merged) and I’ve already used it here
+
+Tem PQD
+Tem PQD
+@tempqd
+2 months ago
+Nice thanks! Can add "Depends on [MR link]" to this MR's description to clarify the other one needs to be merged first
+
+Fady Awny
+Fady Awny
+@fady
+2 months ago
+Can we also get alternative keys to the arrow keys (e.g. m / n or k / j ) since some keyboards don't have the arrow keys.
+
+Grant Gryczan
+Grant Gryczan
+@grantgryczan
+2 months ago
+Is that supported elsewhere in Plasma? Arrow keys are used everywhere, so that request doesn't seem specific to this feature. Also, keyboards without arrow keys are often configured so that a modifier key makes four other keys function like arrow keys.
+
+Nate Graham
+Nate Graham
+@ngraham
+2 months ago
+Developer
+No, we don't do alternate navigation like that, especially not in specific random places. 99.999999% of physical keyboards have arrow keys, and I think that's good enough.
+
+Reply…
+Tem PQD
+Tem PQD
+@tempqd
+3 months ago
+For "Shown when relevant" icons, my suggestion would be to have two new options:
+
+Always appear in the specified order
+Always appear added onto the end (effectively chronological order)
+Maybe another option to always appear added onto the beginning, which would allow pretty much all possible choices of ordering.
+
+This might be difficult to implement though; if so, it could be left for a future MR.
+
+Ramil Nurmanov added 1 commit 3 months ago
+fea0ec90 - systemtray: Use InOutCubic for item reordering
+Compare with previous version
+
+Ramil Nurmanov added 1 commit 3 months ago
+a9c2bd4a - systemtray: Add keyboard-accessible reordering controls
+Compare with previous version
+
+Ramil Nurmanov added 1 commit 3 months ago
+49e0b74c - systemtray: Preserve focus when reordering entries
+Compare with previous version
+
+Ramil Nurmanov added 1 commit 3 months ago
+51afe9f9 - systemtray: Fix ordering of newly added items
+Compare with previous version
+
+Ramil Nurmanov added 1 commit 3 months ago
+9cb2fbc2 - systemtray: Keep delegates alive while dragging
+Compare with previous version
+
+Fernando Marcelino Muniz
+Fernando Marcelino Muniz
+@fernandommuniz
+2 months ago
+Resolved 2 months ago by Nate Graham
+Would the implementation of this feature fix this issue?
+
+Captura_de_tela_20260825_222123
+
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+2 months ago
+Author
+Contributor
+Could you clarify which issue you’re referring to?
+
+Fernando Marcelino Muniz
+Fernando Marcelino Muniz
+@fernandommuniz
+2 months ago
+Until now the "Cachy-Update" was on top of KDE's Clipboard widget, but now it isn't. I preferred when KDE widgets were all next to each other.
+
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+2 months ago
+Author
+Contributor
+This MR will simply allow you to manually change the order of System Tray entries, so you'll be able to place Cachy-Update wherever you prefer.
+
+Tarik Koca
+Tarik Koca
+@tarikzkoca
+2 months ago
+That is, they might be mentioning the default behavior.
+
+Nate Graham
+Nate Graham
+@ngraham
+2 months ago
+Developer
+If so, that's out of scope for the discussion of this MR, which is about allowing users to manually re-arrange things, and does not touch the current default ordering.
+
+Reply…
+Ramil Nurmanov added 1 commit 2 months ago
+fc705273 - systemtray: Add keyboard controls to drag handle
+Compare with previous version
+
+Ramil Nurmanov added 40 commits 2 months ago
+fc705273...09b40f1c - 30 commits from branch plasma:master
+8507d853 - systemtray: Allow manually reordering icons
+d207bb5d - systemtray: Respect categories when resetting icon order
+a229ae17 - systemtray: Handle items added while settings are open
+16d09c44 - systemtray: Fix ordering of duplicate tray items
+97875fe2 - systemtray: Use InOutCubic for item reordering
+3e9e12e1 - systemtray: Add keyboard-accessible reordering controls
+edbfdd8a - systemtray: Preserve focus when reordering entries
+2351e200 - systemtray: Fix ordering of newly added items
+cd0fca55 - systemtray: Keep delegates alive while dragging
+29a2be12 - systemtray: Add keyboard controls to drag handle
+Compare with previous version
+
+ Toggle commit list
+Nate Graham changed milestone to %6.9 2 months ago
+Ramil Nurmanov added 1 commit 2 months ago
+7e3d7d70 - systemtray: Use Kirigami keyboard reordering and add order modes
+Compare with previous version
+
+Ramil Nurmanov added 1 commit 2 months ago
+83edd20e - systemtray: Use Kirigami keyboard reordering and add order modes
+Compare with previous version
+
+Ramil Nurmanov changed the description 2 months ago
+Ramil Nurmanov added 1 commit 2 months ago
+dfacfedf - systemtray: Adapt keyboard navigation to Kirigami reordering
+Compare with previous version
+
+Ramil Nurmanov added 1 commit 2 months ago
+9b0b15ce - systemtray: Delay SNI insertion until initial data is ready
+Compare with previous version
+
+Ramil Nurmanov added 1 commit 2 months ago
+8ef1ffd7 - systemtray: Animate keyboard reordering
+Compare with previous version
+
+Ramil Nurmanov added 1 commit 2 months ago
+6517b721 - systemtray: Use native focus indicators
+Compare with previous version
+
+Ramil Nurmanov added 165 commits 2 months ago
+6517b721...748dacb9 - 149 commits from branch plasma:master
+748dacb9...c029f8f3 - 6 earlier commits
+121366a3 - systemtray: Preserve focus when reordering entries
+d2e7e019 - systemtray: Fix ordering of newly added items
+15211e6b - systemtray: Keep delegates alive while dragging
+87c1291f - systemtray: Add keyboard controls to drag handle
+b0aa6327 - systemtray: Use Kirigami keyboard reordering and add order modes
+8287d0b0 - systemtray: Adapt keyboard navigation to Kirigami reordering
+de6f58f0 - systemtray: Delay SNI insertion until initial data is ready
+6874f078 - systemtray: Animate keyboard reordering
+42791fb0 - systemtray: Use native focus indicators
+b85d177c - remove comment: qmllint disable unqualified
+Compare with previous version
+
+ Toggle commit list
+Iris Hormoviti
+Iris Hormoviti
+@raidev
+2 months ago
+Resolved 1 month ago by Tem PQD
+This might need its own thread, but could something like this be added? image (The ability to rearrange the icons by dragging without having to enter the widget settings, and also being able to hide an icon into the popup by dragging it outside.)
+
+Edited 2 months ago by Iris Hormoviti
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+2 months ago
+Author
+Contributor
+Thank you for the offer. Based on the discussion above, directly reordering the interactive tray is beyond the scope of this MR, so I don't plan to add it here. I think this could still be explored further, perhaps in Plasma editing mode, where direct manipulation of tray icons would be better suited.
+
+Iris Hormoviti
+Iris Hormoviti
+@raidev
+2 months ago
+I think I'd prefer if it was possible outside edit mode, similarly to how you can reorder task manager items, and how it's done in windows and macos.
+
+Tarik Koca
+Tarik Koca
+@tarikzkoca
+2 months ago
+That could potentially be more intuitive for new users but I think edit mode is a better fit both in terms of coherence and usability. In those OSes, it's more chaotic and a misclick can reorder without the intention to do so. Maybe a MR can make it so that every tray icon item is also a sub-widget? Not sure.
+
+Iris Hormoviti
+Iris Hormoviti
+@raidev
+2 months ago
+@tarikzkoca I'd love to, but I have no idea where I would even start with implementing that.
+
+Tarik Koca
+Tarik Koca
+@tarikzkoca
+2 months ago
+It's a big task to read and understand the Plasma codebase, and implementing new features. Let's not go out of scope, but I'm hoping to do so when I have more time.
+
+Grant Gryczan
+Grant Gryczan
+@grantgryczan
+2 months ago
+I realize, if we're concerned about misclicks rearranging the icons, why aren't we concerned with the task manager? Those icons can be dragged without edit mode, and on Windows, I do that on accident far more often than I do in the tray (but still not very often). I think it's surprising if the tray doesn't behave the same way: either the task manager should only be orderable in edit mode, or the tray should only be orderable without edit mode. And nobody is asking for the former, as far as I know.
+
+Iris Hormoviti
+Iris Hormoviti
+@raidev
+2 months ago
+I agree that this would be a weird inconsistency. I think it would be more user friendly to just allow that outside edit mode, it's not like it's a destructive action.
+
+Tarik Koca
+Tarik Koca
+@tarikzkoca
+2 months ago
+That's a good point, Grant. Sacrificing a convenience to prevent such rare misclicks is not logical.
+
+Then yes, being able to edit tray icons without going in the edit mode is only consistent. How and when it would be implemented, I don't know.
+
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+2 months ago
+Author
+Contributor
+While working on this MR, I developed a prototype for changing the order of tray icons, but without the ability to add and delete.
+
+Here is the video:
+
+
+If such an idea gets a response, I'm ready to do it.
+
+Iris Hormoviti
+Iris Hormoviti
+@raidev
+2 months ago
+@ramilnur Nice! I do think the ability to remove icons is important. Probably dragging them from the popup too?
+
+Tarik Koca
+Tarik Koca
+@tarikzkoca
+2 months ago
+That would bring the exact UI parity in mention. Since they are tray icons, wouldn't selecting "Never show (disabled)" in System Tray Settings effectively remove them?
+
+Is there a need for another way to remove it?
+
+Iris Hormoviti
+Iris Hormoviti
+@raidev
+2 months ago
+What I meant is dragging them out to make them only show in the popup, and yes I think it's necessary. Often when I install a new app that uses a tray icon, I don't want it pinned to my tray, so I have to: go into edit mode > hover on the system tray > press settings > scroll through a big list in entries to find the specific one > set it to show only in popup
+
+This is very annoying to do, and it's the exact reason why I'm proposing this.
+
+Tarik Koca
+Tarik Koca
+@tarikzkoca
+1 month ago
+But there's no viable alternative way to disable tray icons. In alternative OSes that implement this, the only way to disable tray icons is to open the relevant app, navigate their UI and find a way to disable it, which is something they might not even offer.
+
+Not only KDE's menu is more consistent, so people don't have to navigate different UIs, but it also offers more control to disable icons.
+
+If finding each icon is difficult, which I don't think is the case, then automatic categorization will solve this problem. I'm not sure, but if I'm not mistaken, there was a search bar too.
+
+Grant Gryczan
+Grant Gryczan
+@grantgryczan
+1 month ago
+I would strongly advise dragging out NOT to immediately disable the icon. Otherwise, I will do that on accident every once in a while, and unlike reordering, it will be very difficult to undo since I won't necessarily know what I hid.
+
+If we do want to add a shortcut for convenience, showing a context menu with a "Hide XYZ tray icon" or "Disable XYZ tray icon" option (perhaps with better phrasing) upon drag out would fix this problem, along with an option to dismiss. Clicking out would also dismiss.
+
+Edited 1 month ago by Grant Gryczan
+Iris Hormoviti
+Iris Hormoviti
+@raidev
+1 month ago
+I think it's fine for it to not disable the icon with just a drag. That should be a context menu shortcut, if at all implemented outside the settings menu.
+
+Tem PQD
+Tem PQD
+@tempqd
+1 month ago
+if we're concerned about misclicks rearranging the icons, why aren't we concerned with the task manager?
+
+Task manager click targets are significantly larger (by default) and requires farther drag to trigger reorder. Tray icons are smaller and would require shorter drag. I have mouse in mind (can click and move pointer at same time more easily), but it may depend on input device, e.g. I think stylus would be even easier to accidentally drag small things.
+
+But in any case, draggable reordering (which wouldn't be identical to task manager behavior) would have more complications for the ordering logic that we should discuss in a followup issue or MR.
+
+Reply…
+Iris Hormoviti
+Iris Hormoviti
+@raidev
+2 months ago
+Reading some of the discussion here, there seems to be a group sort mode by default. I think if the user rearranged one of the items this way it would probably turn the sort mode to manual, and the new sort position could be to the right of the visible icon the user is placing it next to (or the opposite).
+
+Ramil Nurmanov resolved all threads 2 months ago
+Ramil Nurmanov resolved all threads 2 months ago
+Ramil Nurmanov added 76 commits 1 month ago
+b85d177c...2ecf57b0 - 60 commits from branch plasma:master
+2ecf57b0...4e6e86a4 - 6 earlier commits
+db7d9944 - systemtray: Preserve focus when reordering entries
+8153a843 - systemtray: Fix ordering of newly added items
+6103b6e7 - systemtray: Keep delegates alive while dragging
+f9e9d4e3 - systemtray: Add keyboard controls to drag handle
+99f86cbb - systemtray: Use Kirigami keyboard reordering and add order modes
+f8ec8f28 - systemtray: Adapt keyboard navigation to Kirigami reordering
+f5154d70 - systemtray: Delay SNI insertion until initial data is ready
+f9380593 - systemtray: Animate keyboard reordering
+edc60ae2 - systemtray: Use native focus indicators
+d8838f4b - remove comment: qmllint disable unqualified
+Compare with previous version
+
+ Toggle commit list
+David Edmundson
+David Edmundson @davidedmundson started a thread on an old version of the diff 1 month ago
+Resolved 1 month ago by Ramil Nurmanov
+applets/systemtray/systemtray.cpp 
+    source->scroll(delta, direction);
+}
+
+QStringList SystemTray::materializeOrderWithMove(const QString &itemId, const QString &beforeItemId)
+David Edmundson
+David Edmundson
+@davidedmundson
+1 month ago
+Developer
+I don't understand this method.
+
+We have a list in the config, but instead of using the list in the config, we take a model and extract from that and build the list.
+
+Ramil Nurmanov
+changed this line in version 20 of the diff 1 month ago 
+Reply…
+Ramil Nurmanov added 1 commit 1 month ago
+1205e6a1 - systemtray: Remove unused item reordering API
+Compare with previous version
+
+Ramil Nurmanov resolved all threads 1 month ago
+Nate Graham
+Nate Graham
+@ngraham
+1 month ago
+Developer
+Resolved 1 month ago by Nate Graham
+Little nitpick: this line doesn't span the full view:
+
+image
+
+Nate Graham
+Nate Graham
+@ngraham
+1 month ago
+Developer
+I believe this has happened because you've removed the Kirigami.InlineViewHeader and built your own thing. Don't do that; keep it where it is. Worst-case scenario is you can override the contentItem to have what you want in it, but I don't think that's actually necessary.
+
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+1 month ago
+Author
+Contributor
+Returned it Kirigami.InlineViewHeader
+
+57.png
+
+Reply…
+Nate Graham
+Nate Graham @ngraham started a thread on an old version of the diff 1 month ago
+Resolved 1 month ago by Ramil Nurmanov
+applets/systemtray/qml/ConfigGeneral.qml 
+    }
+
+    function headerRowData(category) {
+        return {
+            "isHeader": true,
+            "itemId": "",
+            "stableKey": "",
+            "displayText": "",
+            "itemType": "",
+            "category": category,
+        };
+    }
+
+    function isGrouped() {
+        return cfg_iconOrder.length === 0;
+    }
+Comment on lines +140 to +142
+Nate Graham
+Nate Graham
+@ngraham
+1 month ago
+Developer
+Since cfg_iconOrder is a property, can't thos whole thing be a bound propery, and not a function?
+
+readonly property isGrouped: cfg_iconOrder.length === 0
+
+Ramil Nurmanov
+changed this line in version 21 of the diff 1 month ago 
+Reply…
+Nate Graham
+Nate Graham
+@ngraham
+1 month ago
+Developer
+Resolved 1 month ago by Konrad Materka
+All the model code really needs to be in C++. I see a ton of manual model munging in applets/systemtray/qml/ConfigGeneral.qml that doesn't belong there.
+
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+1 month ago
+Author
+Contributor
+I ported most of the functions to c++, everything works as well
+
+Nate Graham
+Nate Graham
+@ngraham
+1 month ago
+Developer
+Thanks!
+
+Konrad Materka
+Konrad Materka
+@kmaterka
+1 month ago
+Developer
+nice! This is what I noticed as well but I did not comment because I was not an active KDE developer for many years now. For the context: I created this C++ model, with an intention to implement manual sorting one day - as you can see not everything went as planned 😄 Anyway, good work!
+
+Reply…
+Nate Graham
+Nate Graham
+@ngraham
+1 month ago
+Developer
+Resolved 1 month ago by Nate Graham
+Likewise all the manual focus stuff. This is a code smell; it should all work automatically, or at least mostly automatically. I suspect it probably will if you use a standard data model.
+
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+1 month ago
+Author
+Contributor
+Reduced the focus code in qml
+
+Reply…
+Nate Graham
+Nate Graham @ngraham started a thread on an old version of the diff 1 month ago
+Resolved 1 month ago by Ramil Nurmanov
+applets/systemtray/qml/ConfigGeneral.qml 
+                sourceComponent: Component {
+                    Kirigami.ListSectionHeader {
+                        width: headerLoader.width
+                        text: iconsPage.categoryName(delegateRoot.category)
+                    }
+                }
+            }
+
+        delegate: TrayItemDelegate {}
+            Loader {
+                id: entryLoader
+                active: !delegateRoot.isHeader
+                anchors.left: parent.left
+                anchors.right: parent.right
+                sourceComponent: Component {
+                    TrayItemDelegate {
+Comment on lines +873 to +874
+Nate Graham
+Nate Graham
+@ngraham
+1 month ago
+Developer
+When doing it inline like this, you can omit Component:
+
+Suggested change 
+                sourceComponent: Component {
+                    TrayItemDelegate {
+                sourceComponent: TrayItemDelegate {
+Ramil Nurmanov
+changed this line in version 24 of the diff 1 month ago 
+Reply…
+Nate Graham requested changes 1 month ago
+Nate Graham
+Nate Graham
+@ngraham
+1 month ago
+Developer
+The UX is quite good! The implementation under the hood could use a bit of massaging.
+
+Ramil Nurmanov added 1 commit 1 month ago
+97bd5af9 - systemtray: Make grouped state a property
+Compare with previous version
+
+Ramil Nurmanov added 1 commit 1 month ago
+730edc8a - systemtray: moved the model logic from QML to C++
+Compare with previous version
+
+Nate Graham
+Nate Graham @ngraham started a thread on an old version of the diff 1 month ago
+Resolved 1 month ago by Nate Graham
+applets/systemtray/qml/ConfigGeneral.qml 
+        function onOrderChanged() {
+            const order = iconsPage.configModel.order;
+            if (order.length !== iconsPage.cfg_iconOrder.length || order.some((itemId, i) => itemId !== iconsPage.cfg_iconOrder[i])) {
+                iconsPage.cfg_iconOrder = order;
+            }
+        }
+    }
+
+    function focusDialogFooter(): bool {
+        for (let p = iconsPage.parent; p; p = p.parent) {
+            const row = p.footer?.contentItem ?? null;
+            if (!row || row.children === undefined) {
+                continue;
+            }
+            for (const button of row.children) {
+                if (String(button.icon?.name ?? "").startsWith("dialog-")
+Nate Graham
+Nate Graham
+@ngraham
+1 month ago
+Developer
+Surely there must be a better way to get a button than matching on its icon name. This is very fragile.
+
+Ramil Nurmanov
+changed this line in version 23 of the diff 1 month ago 
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+1 month ago
+Author
+Contributor
+This was already removed in commit 6829c0fc, along with the rest of the manual focus handling.
+
+Reply…
+Nate Graham
+Nate Graham @ngraham started a thread on an old version of the diff 1 month ago
+Resolved 1 month ago by Nate Graham
+applets/systemtray/qml/ConfigGeneral.qml 
+        target: iconsPage.configModel
+        property: "filterText"
+        value: iconsPage.searchFilterText
+    }
+
+    Connections {
+        target: iconsPage.configModel
+        function onOrderChanged() {
+            const order = iconsPage.configModel.order;
+            if (order.length !== iconsPage.cfg_iconOrder.length || order.some((itemId, i) => itemId !== iconsPage.cfg_iconOrder[i])) {
+                iconsPage.cfg_iconOrder = order;
+            }
+        }
+    }
+
+    function focusDialogFooter(): bool {
+Nate Graham
+Nate Graham
+@ngraham
+1 month ago
+Developer
+This seems like it's working around a focus issue with the standard dialog component. Can we fix that?
+
+Ramil Nurmanov
+changed this line in version 23 of the diff 1 month ago 
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+1 month ago
+Author
+Contributor
+This was already removed in commit 6829c0fc, along with the rest of the manual focus handling.
+
+Reply…
+Nate Graham requested changes 1 month ago
+Ramil Nurmanov added 1 commit 1 month ago
+6829c0fc - systemtray: Use native tab navigation for entries
+Compare with previous version
+
+Ramil Nurmanov added 1 commit 1 month ago
+3e3bf079 - systemtray: Remove redundant Component wrappers
+Compare with previous version
+
+Ramil Nurmanov added 1 commit 1 month ago
+c7f4f1c4 - systemtray: Restore InlineViewHeader for entries
+Compare with previous version
+
+Konrad Materka
+Konrad Materka @kmaterka started a thread on the diff 1 month ago
+Resolved 1 month ago by Nate Graham
+applets/systemtray/sortedsystemtraymodel.cpp 
+{
+    const int categoriesComparison = compareCategoriesAlphabetically(left, right);
+    if (categoriesComparison == 0) {
+        return QSortFilterProxyModel::lessThan(left, right);
+    } else {
+        return categoriesComparison < 0;
+    }
+    return compare(left, right, m_settings ? m_settings->itemOrder() : QStringList()) < 0;
+}
+
+bool SortedSystemTrayModel::lessThanSystemTray(const QModelIndex &left, const QModelIndex &right) const
+int SortedSystemTrayModel::compare(const QModelIndex &left, const QModelIndex &right, const QStringList &order)
+{
+    QVariant itemIdLeft = left.data(static_cast<int>(BaseModel::BaseRole::ItemId));
+    QVariant itemIdRight = right.data(static_cast<int>(BaseModel::BaseRole::ItemId));
+    if (itemIdRight.toString() == QLatin1String("org.kde.plasma.notifications")) {
+Konrad Materka
+Konrad Materka
+@kmaterka
+1 month ago
+Developer
+I lost track in all of these comments - is this removal intentional? Currently "Notifications" applet is always the first one, was it decided to drop this behavior?
+
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+1 month ago
+Author
+Contributor
+Yes, I did it intentionally so that users could change the order.
+
+Konrad Materka
+Konrad Materka
+@kmaterka
+1 month ago
+Developer
+I get this for manual sort, this part is fine. My point is about default order, as we currently have: this should not change, unless this is approved by VDG (or whoever approves this kind of things now, CC: @ngraham ). So I was thinking about something like:
+
+if (!manualSortUsed) {
+    if (itemLeft/Right == "org.kde.plasma.notifications") {
+       return true/false;
+    }
+}
+If not then we will get flood of bug reports reporting regression. And when fixed, another reports demanding to return the regression behavior 😃
+
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+1 month ago
+Author
+Contributor
+Ah, I see now. Sorry, I've updated it accordingly.
+
+Reply…
+Konrad Materka left review comments 1 month ago
+Ramil Nurmanov added 1 commit 1 month ago
+e04cf0c4 - systemtray: Preserve notifications-first default order
+Compare with previous version
+
+Nate Graham resolved all threads 1 month ago
+Nate Graham
+Nate Graham @ngraham started a thread on an old version of the diff 1 month ago
+Resolved 1 month ago by Nate Graham
+applets/systemtray/qml/ConfigGeneral.qml 
+            }
+        }
+    }
+
+    function stackHeaderBeforeView(): void {
+        for (let header = headerLayout; header?.parent; header = header.parent) {
+            for (let view = itemsList; view?.parent; view = view.parent) {
+                if (header.parent === view.parent) {
+                    Plasmoid.stackItemBefore(header, view);
+                    return;
+                }
+            }
+        }
+    }
+
+    Component.onCompleted: Qt.callLater(stackHeaderBeforeView)
+Comment on lines +93 to +104
+Nate Graham
+Nate Graham
+@ngraham
+1 month ago
+Developer
+What's all this about?
+
+Ramil Nurmanov
+changed this line in version 27 of the diff 1 month ago 
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+1 month ago
+Author
+Contributor
+This was a workaround for the Tab order, since focus would move to the entries list before the controls above it. I've removed it for now. If this turns out to be a significant issue, I can address it in a separate MR.
+
+Reply…
+Nate Graham
+Nate Graham @ngraham started a thread on an old version of the diff 1 month ago
+Resolved 1 month ago by Ramil Nurmanov
+applets/systemtray/qml/ConfigGeneral.qml 
+
+        clip: true
+
+        model: KItemModels.KSortFilterProxyModel {
+            id: sortFilterProxyModel
+            filterCaseSensitivity: Qt.CaseInsensitive
+            Component.onCompleted: sourceModel = Plasmoid.configSystemTrayModel // avoid unnecessary binding, it causes loops
+        }
+        reuseItems: true
+        model: iconsPage.configModel
+        currentIndex: -1
+        keyNavigationEnabled: false
+        cacheBuffer: Math.max(1, count) * Kirigami.Units.gridUnit * 4
+Nate Graham
+Nate Graham
+@ngraham
+1 month ago
+Developer
+Why is this needed?
+
+Ramil Nurmanov
+changed this line in version 28 of the diff 1 month ago 
+Reply…
+Nate Graham
+Nate Graham @ngraham started a thread on the diff 1 month ago
+Resolved 1 month ago by Ramil Nurmanov
+applets/systemtray/qml/ConfigGeneral.qml 
+
+        clip: true
+
+        model: KItemModels.KSortFilterProxyModel {
+            id: sortFilterProxyModel
+            filterCaseSensitivity: Qt.CaseInsensitive
+            Component.onCompleted: sourceModel = Plasmoid.configSystemTrayModel // avoid unnecessary binding, it causes loops
+        }
+        reuseItems: true
+        model: iconsPage.configModel
+        currentIndex: -1
+        keyNavigationEnabled: false
+Nate Graham
+Nate Graham
+@ngraham
+1 month ago
+Developer
+Why not?
+
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+1 month ago
+Author
+Contributor
+I tested this with keyNavigationEnabled: true. When the drag handle is focused via Tab, pressing Up or Down causes it to lose focus because ListView handles these keys. Setting it to false prevents this.
+
+Nate Graham
+Nate Graham
+@ngraham
+1 month ago
+Developer
+Cool. Can you add an inline comment explaining this?
+
+Reply…
+Nate Graham
+Nate Graham @ngraham started a thread on an old version of the diff 1 month ago
+Resolved 1 month ago by Ramil Nurmanov
+applets/systemtray/qml/ConfigGeneral.qml 
+                        ]
+
+                        implicitContentWidthPolicy: QQC2.ComboBox.WidestText
+
+                        currentIndex: iconsPage.isGrouped ? 0 : 1
+
+                        onActivated: index => {
+                            iconsPage.configModel.setGrouped(index === 0);
+                            currentIndex = Qt.binding(() => iconsPage.isGrouped ? 0 : 1);
+                        }
+                    }
+                },
+                Kirigami.Action {
+                    displayHint: Kirigami.DisplayHint.KeepVisible
+                    displayComponent: Kirigami.SearchField {
+                        Component.onCompleted: iconsPage.configModel.filterText = text
+Nate Graham
+Nate Graham
+@ngraham
+1 month ago
+Developer
+Is this necessary?
+
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+1 month ago
+Author
+Contributor
+Yes, this is needed because the config model outlives the settings page. I tested removing it: after closing and reopening the settings, the search field is empty but the list remains filtered by the previous text. This resets the filter when the page is created.
+
+Nate Graham
+Nate Graham
+@ngraham
+1 month ago
+Developer
+Can you add an inline comment explaining this? Otherwise I think it's not obvious.
+
+Ramil Nurmanov
+changed this line in version 33 of the diff 1 month ago 
+Reply…
+Nate Graham
+Nate Graham @ngraham started a thread on the diff 1 month ago
+Resolved 1 month ago by Ramil Nurmanov
+applets/systemtray/qml/ConfigGeneral.qml 
+            required property int index
+            required property bool isHeader
+            required property var applet
+            required property var category
+            required property var decoration
+            required property string displayText
+            required property string itemId
+            required property string itemType
+
+            readonly property Item activeItem: isHeader ? headerLoader.item : entryLoader.item
+
+                text: iconsPage.categoryName(section)
+            width: itemsList.width
+            implicitHeight: activeItem ? activeItem.implicitHeight : 0
+
+            Component.onCompleted: Qt.callLater(itemsList.restackDelegates)
+Nate Graham
+Nate Graham
+@ngraham
+1 month ago
+Developer
+Why do we need this on each delegate?
+
+Reply…
+Nate Graham
+Nate Graham @ngraham started a thread on an old version of the diff 1 month ago
+Resolved 1 month ago by Ramil Nurmanov
+applets/systemtray/qml/ConfigGeneral.qml 
+            required property string itemId
+            required property string itemType
+
+            readonly property Item activeItem: isHeader ? headerLoader.item : entryLoader.item
+
+                text: iconsPage.categoryName(section)
+            width: itemsList.width
+            implicitHeight: activeItem ? activeItem.implicitHeight : 0
+
+            Component.onCompleted: Qt.callLater(itemsList.restackDelegates)
+
+            Loader {
+                id: headerLoader
+                active: delegateRoot.isHeader
+                width: delegateRoot.width
+                sourceComponent: Kirigami.ListSectionHeader {
+Nate Graham
+Nate Graham
+@ngraham
+1 month ago
+Developer
+Typically this isn't inside the delegate itself, but rather it's done on the listview itself. Which requires that the listview's model supports sections in the standard way.
+
+Ramil Nurmanov
+changed this line in version 30 of the diff 1 month ago 
+Reply…
+Nate Graham requested changes 1 month ago
+Ramil Nurmanov added 1 commit 1 month ago
+8baec9cc - systemtray: Remove header tab order workaround
+Compare with previous version
+
+Ramil Nurmanov added 1 commit 1 month ago
+4dff50f1 - systemtray: Remove unnecessary ListView cacheBuffer
+Compare with previous version
+
+Ramil Nurmanov added 1 commit 1 month ago
+fb1b8e94 - systemtray: Simplify delegate tab order handling
+Compare with previous version
+
+Ramil Nurmanov added 1 commit 1 month ago
+f2e9fb56 - systemtray: Use ListView sections for category headers
+Compare with previous version
+
+Nate Graham
+Nate Graham @ngraham started a thread on the diff 1 month ago
+Resolved 5 days ago by Nate Graham
+applets/systemtray/qml/ConfigGeneral.qml 
+            }
+        }
+
+        delegate: TrayItemDelegate {}
+        delegate: Item {
+Nate Graham
+Nate Graham
+@ngraham
+1 month ago
+Developer
+Is this wrapper item still needed?
+
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+1 month ago
+Author
+Contributor
+Yes, it's still needed. Kirigami.ListItemDragHandle requires listItem to be a child of the ListView delegate, not the delegate itself, because it temporarily reparents the item during dragging. This is also documented in its API.
+
+Christoph Wolk
+Christoph Wolk
+@cwo
+1 month ago
+Developer
+Are you sure? We don't do this in similar ListView delegates, like lock_logout or timer, and they seem to work fine.
+
+Nate Graham
+Nate Graham
+@ngraham
+5 days ago
+Developer
+Re-opening for further investigation, per Christoph's comment.
+
+Christoph Wolk
+Christoph Wolk
+@cwo
+5 days ago
+Developer
+In fact I was wrong and we do. This is fine.
+
+Reply…
+Nate Graham resolved all threads 1 month ago
+Nate Graham
+Nate Graham
+@ngraham
+1 month ago
+Developer
+Resolved 4 weeks ago by Ramil Nurmanov
+I notice that switching from "manual" to "grouped by category" destroys the saved ordering I made while in manual mode. Could it be kept so that the next time I go back to manual mode, my previous ordering is still there?
+
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+1 month ago
+Author
+Contributor
+I've updated
+
+Would it also make sense to add a "Reset" button in Manual order mode, so users can restore the default ordering?
+
+Nate Graham
+Nate Graham
+@ngraham
+1 month ago
+Developer
+Ideally yes. Can widget config dialogs have standard reset buttons, though? I don't think I've ever seen one, like I see in System Settings KCMs.
+
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+1 month ago
+Author
+Contributor
+Well, what do you think about this button arrangement?
+
+65.png
+
+Nate Graham
+Nate Graham
+@ngraham
+1 month ago
+Developer
+It's a lot of things on the header. Something is probably going to get cut off at small window sizes, especially in languages with longer strings than Chinese and English.
+
+In such a circumstance, make sure the search field remains visible at least. There's a Kirigami.Action displayHint for this that you can pass to ActionToolbar IIRC.
+
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+1 month ago
+Author
+Contributor
+I've updated the title to fit the smaller size of the window. Now it looks like this:
+
+70.png
+
+Nate Graham
+Nate Graham
+@ngraham
+1 month ago
+Developer
+Almost! Can you make sure the search field is always shown? This is a bit awkward:
+
+image
+
+The "Always show all entries" checkbox should preferentially collapse into the overflow menu.
+
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+1 month ago
+Author
+Contributor
+I kept the same behavior as before this MR, where the search field could also end up in the overflow menu. This happens because of the order of actions in the header.
+
+Nate Graham
+Nate Graham
+@ngraham
+1 month ago
+Developer
+Right, I'm asking if you can change it. :) Before it didn't much matter because there weren't very many items on the header, so the search field was unlikely to get pushed into the overflow menu. With the two new items being added here, it's now more likely to happen, so I think it's worth handling that case.
+
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+1 month ago
+Author
+Contributor
+Ah, I see. I'll fix that
+
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+4 weeks ago
+Author
+Contributor
+Fixed it, now only the search is shown at the end. Implemented through width counting and displayHint
+
+Reply…
+Nate Graham
+Nate Graham
+@ngraham
+1 month ago
+Developer
+This is pretty solid stuff. The UX is overall excellent, except for the thing I just noticed and wrote about in another comment. The QML changes look sensible to me.
+
+I'll let someone else review the C++ side, as that's not my strength.
+
+Ramil Nurmanov added 3 commits 1 month ago
+af926265 - systemtray: Explain disabled ListView key navigation
+3f478e1e - systemtray: Explain search filter reset
+810c11bf - systemtray: Preserve manual order when switching modes
+Compare with previous version
+
+Ramil Nurmanov added 1 commit 1 month ago
+d651d186 - systemtray: Add reset button for manual icon order
+Compare with previous version
+
+Ramil Nurmanov added 1 commit 1 month ago
+e134cbb7 - systemtray: Make entries header responsive
+Compare with previous version
+
+Christoph Wolk
+Christoph Wolk @cwo started a thread on an old version of the diff 1 month ago
+Resolved 3 weeks ago by Ramil Nurmanov
+applets/systemtray/qml/ConfigGeneral.qml 
+                },
+                Kirigami.Action {
+                    enabled: !iconsPage.isGrouped && iconsPage.cfg_iconOrder.length > 0
+                    icon.name: "edit-reset-symbolic"
+                    text: i18nc("@action:button Restore the default order of System Tray entries", "Reset Order")
+                    onTriggered: iconsPage.cfg_iconOrder = []
+                }
+            ]
+        }
+
+        function restackDelegates(): void {
+            let previous = null;
+            for (let row = 0; row < count; ++row) {
+                const item = itemAtIndex(row);
+                if (item) {
+                    Plasmoid.stackItemAfter(item, previous);
+Christoph Wolk
+Christoph Wolk
+@cwo
+1 month ago
+Developer
+This affects the order of the entries in the actual tray, right? Shouldn't this happen in the tray, rather than the tray's configuration dialog?
+
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+4 weeks ago
+Author
+Contributor
+No, this only fixes Tab navigation in the configuration dialog. The actual tray icon order is handled separately.
+
+Christoph Wolk
+Christoph Wolk
+@cwo
+4 weeks ago
+Developer
+Does not seem to work reliably (this is me just pressing tab)
+
+
+In any case, this already wasn't the greatest keyboard UX - I think it would be better in the medium-term to have arrow navigation on the rows, and only do tab to move within that delegate (and then out of the listview). We do this in a couple of other places already. And there's a lot of buttons/elements on most delegates here, so going just with tab is very tedious.
+
+But that does not have to be part of this MR, which is already very large.
+
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+4 weeks ago
+Author
+Contributor
+Got it, thanks! I'll address the keyboard navigation improvements in a separate MR.
+
+Ramil Nurmanov
+changed this line in version 35 of the diff 3 weeks ago 
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+3 weeks ago
+Author
+Contributor
+I've updated the restacking logic to sort delegates by their model indices. I can no longer reproduce the issue locally. Could you check if this fixes it for you?
+
+Reply…
+Ramil Nurmanov added 1 commit 4 weeks ago
+14783f3f - systemtray: Prioritize search field in entries header
+Compare with previous version
+
+Ramil Nurmanov resolved all threads 4 weeks ago
+Ramil Nurmanov added 1 commit 3 weeks ago
+c184fa7f - systemtray: Fix Tab order by restacking delegates
+Compare with previous version
+
+Ramil Nurmanov resolved all threads 3 weeks ago
+Fabian Severin
+Fabian Severin
+@kilruna
+2 weeks ago
+Hi! I have a working prototype for native drag-and-drop directly between the System Tray panel and its popup, using the tray-only changes from this MR as its ordering/persistence foundation.
+
+It supports reordering within the panel, moving entries into the popup and back, and returning an entry when the panel has become completely empty. The existing popup layout is preserved.
+
+I used an AI coding agent to implement the prototype and then tested it in my own Plasma 6.8.2/Wayland session. There are also model tests and isolated native Wayland GUI tests, including persistence across a new plugin process and status changes while the popup is open.
+
+Before publishing a branch, I would like to coordinate with you and preserve the attribution for your work. My preference would be a separate follow-up MR depending on this one, keeping your current review focused. Would that fit your plans? I have a local master-based branch, but it is still undergoing integration review and is not submitted yet.
+
+Edit: Here a little video for a better understanding of what my goals are: https://youtu.be/qCgfXZuAzHA
+
+Edited 2 weeks ago by Fabian Severin
+Ramil Nurmanov added 298 commits 1 week ago
+c184fa7f...31f2fc82 - 264 commits from branch plasma:master
+31f2fc82...4245fc91 - 24 earlier commits
+f784bbf9 - systemtray: Remove unnecessary ListView cacheBuffer
+b610aff4 - systemtray: Simplify delegate tab order handling
+6ebf4d47 - systemtray: Use ListView sections for category headers
+37432860 - systemtray: Explain disabled ListView key navigation
+13bfd505 - systemtray: Explain search filter reset
+19083d9d - systemtray: Preserve manual order when switching modes
+0bb77ea8 - systemtray: Add reset button for manual icon order
+2525074c - systemtray: Make entries header responsive
+c65dc3bb - systemtray: Prioritize search field in entries header
+d4f3b73a - systemtray: Fix Tab order by restacking delegates
+Compare with previous version
+
+ Toggle commit list
+Nate Graham
+Nate Graham
+@ngraham
+1 week ago
+Developer
+The UX is really nice here! I can't find any issues. I'll start on code review.
+
+Nate Graham
+Nate Graham
+@ngraham
+1 week ago
+Developer
+Resolved 5 days ago by Ramil Nurmanov
+I don't love all this manual work with the toolbar to make sure things fit. It feels like working around missing API in Kirigami.ActionToolBar.
+
+What's missing?
+
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+1 week ago
+Author
+Contributor
+KeepVisible collapses an action to its icon delegate as soon as the full one doesn't fit, and only hides earlier actions if even the icon doesn't fit. For the search field, that leaves an empty "Search" button while the checkbox stays visible. I think we need a new display hint that prioritizes keeping the full delegate visible before collapsing it. I'd prefer adding a new flag rather than changing KeepVisible, to avoid affecting existing toolbars.
+
+I can implement this in Kirigami and then remove the manual width calculations here
+
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+1 week ago
+Author
+Contributor
+I've implemented KeepFullVisible in Kirigami and updated the system tray to use it. This removes all the manual width calculations from the header.
+
+MR: frameworks/kirigami!2238 (merged)
+
+Reply…
+Nate Graham
+Nate Graham @ngraham started a thread on an old version of the diff 1 week ago
+Resolved 1 week ago by Ramil Nurmanov
+applets/systemtray/qml/ConfigGeneral.qml 
+                            restoreMode: Binding.RestoreNone
+                        }
+                    }
+                },
+                Kirigami.Action {
+                    text: i18nc("@title:menu Submenu for choosing how System Tray entries are ordered", "Entry Order")
+                    displayComponent: QQC2.ComboBox {
+                        model: [groupedAction.text, manualOrderAction.text]
+
+                        implicitContentWidthPolicy: QQC2.ComboBox.WidestText
+
+                        currentIndex: iconsPage.isGrouped ? 0 : 1
+
+                        onActivated: index => {
+                            iconsPage.cfg_manualIconOrder = index === 1;
+                            currentIndex = Qt.binding(() => iconsPage.isGrouped ? 0 : 1);
+Nate Graham
+Nate Graham
+@ngraham
+1 week ago
+Developer
+Why do we need to use Qt.binding() for this and the other two usages?
+
+Ramil Nurmanov
+changed this line in version 37 of the diff 1 week ago 
+Ramil Nurmanov
+Ramil Nurmanov
+@ramilnur
+1 week ago
+Author
+Contributor
+I've removed the unnecessary Qt.binding() calls and used an ActionGroup to keep the actions in sync.
+
+Reply…
+Nate Graham
+Nate Graham
+@ngraham
+1 week ago
+Developer
+CC @mart @broulik @kmaterka for further review and comments if necessary
+
+Nate Graham left review comments 1 week ago
+Ramil Nurmanov added 1 commit 1 week ago
+b81c9a57 - systemtray: Avoid unnecessary Qt.binding() calls
+Compare with previous version
+
+Ramil Nurmanov added 1 commit 1 week ago
+5295a24b - systemtray: Use KeepFullVisible for search field
+Compare with previous version
+
+Ramil Nurmanov mentioned in merge request frameworks/kirigami!2238 (merged) 1 week ago
+Fabian Severin mentioned in merge request !7406 1 week ago
+Ramil Nurmanov added 1 commit 6 days ago
+01bf0452 - use keepVisible
+Compare with previous version
+
+Nate Graham mentioned in commit frameworks/kirigami@b43d5334 5 days ago
+Ramil Nurmanov resolved all threads 5 days ago
+Nate Graham
+Nate Graham
+@ngraham
+5 days ago
+Developer
+Looks like this needs a manual rebase on git master now.
+
+Nate Graham resolved all threads 5 days ago
+Ramil Nurmanov added 72 commits 5 days ago
+01bf0452...5c5b57e2 - 35 commits from branch plasma:master
+5c5b57e2...e244f036 - 27 earlier commits
+3f016f5a - systemtray: Explain disabled ListView key navigation
+c9b7a3a6 - systemtray: Explain search filter reset
+c6e8cb8a - systemtray: Preserve manual order when switching modes
+c45cbe96 - systemtray: Add reset button for manual icon order
+46c8cae3 - systemtray: Make entries header responsive
+8740bb29 - systemtray: Prioritize search field in entries header
+a758592f - systemtray: Fix Tab order by restacking delegates
+e8ccd0ef - systemtray: Avoid unnecessary Qt.binding() calls
+d6de10cd - systemtray: Use KeepFullVisible for search field
+1186e2fe - use keepVisible
+Compare with previous version
+
+ Toggle commit list
+Nate Graham
+Nate Graham @ngraham started a thread on the diff 5 days ago
+Resolved 4 days ago by Ramil Nurmanov
+applets/systemtray/qml/ConfigGeneral.qml 
+        }
+
+        move: Transition {
+            NumberAnimation {
+                property: "y"
+                duration: Kirigami.Units.shortDuration
+                easing.type: Easing.InOutCubic
+            }
+        }
+        moveDisplaced: Transition {
+            NumberAnimation {
+                property: "y"
+                duration: Kirigami.Units.shortDuration
+                easing.type: Easing.InOutCubic
+            }
+        }
+Comment on lines +462 to +475
+Nate Graham
+Nate Graham
+@ngraham
+5 days ago
+Developer
+Can you add X transitions too? The entries also move along the X axis when you switch between the grouped and re-arrangable modes
+
+Reply…
+Nate Graham
+Nate Graham
+@ngraham
+5 days ago
+Developer
+Otherwise this looks pretty good to me!
+
+Nate Graham
+Nate Graham
+@ngraham
+5 days ago
+Developer
+Would appreciate additional reviews, though. It's a large change and will be a significant user-visible feature.
+
+Ramil Nurmanov added 1 commit 4 days ago
+cfe38d1a - systemtray: Animate horizontal movement when switching order modes
+Compare with previous version
+
+Ramil Nurmanov resolved all threads 4 days ago
+Marco Martin
+Marco Martin @mart started a thread on an old version of the diff 4 days ago
+Resolved 4 days ago by Ramil Nurmanov
+applets/systemtray/autotests/sortedsystemtraymodeltest.cpp  0 → 100644
+
+void SortedSystemTrayModelTest::testCustomOrderMovesNotifications()
+{
+    QPointer<SystemTraySettings> settings = createSettings();
+
+    MockTrayModel source({
+        {u"alpha"_s, u"ApplicationStatus"_s},
+        {u"org.kde.plasma.notifications"_s, u"SystemServices"_s},
+        {u"unknown"_s, u"UnknownCategory"_s},
+    });
+
+    SortedSystemTrayModel proxy(settings);
+    proxy.setSourceModel(&source);
+
+    settings->setManualItemOrder(true);
+    settings->setItemOrder({u"alpha"_s, u"org.kde.plasma.notifications"_s});
+Marco Martin
+Marco Martin
+@mart
+4 days ago
+Developer
+This setItemOrder function is used only on the autotest... kinda means the autotest doesn't test the same codepath of the actual usage?
+
+Ramil Nurmanov
+changed this line in version 42 of the diff 4 days ago 
+Reply…
+Marco Martin
+Marco Martin @mart started a thread on the diff 4 days ago
+Resolved 4 days ago by Ramil Nurmanov
+applets/systemtray/systemtrayconfigmodel.h  0 → 100644
+class SystemTrayConfigModel : public QAbstractListModel
+{
+    Q_OBJECT
+    Q_PROPERTY(QStringList order READ order WRITE setOrder NOTIFY orderChanged)
+    Q_PROPERTY(bool grouped READ isGrouped WRITE setGrouped NOTIFY groupedChanged)
+    Q_PROPERTY(QString filterText READ filterText WRITE setFilterText NOTIFY filterTextChanged)
+
+public:
+    explicit SystemTrayConfigModel(QAbstractItemModel *sourceModel, QObject *parent = nullptr);
+
+    QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
+    int rowCount(const QModelIndex &parent = QModelIndex()) const override;
+    QHash<int, QByteArray> roleNames() const override;
+
+    QStringList order() const;
+    void setOrder(const QStringList &order);
+Marco Martin
+Marco Martin
+@mart
+4 days ago
+Developer
+this is also used only in autotests, and i see a confusing duplicate source of truth for the order: both in systemTrayConfigModel and systemTraySettings. For sure it makes the code a bit more hard to follow.
+
+it seems that they are synced only in qml in the config dialog: this seems quite fragile, it should probably access directly SystemtraySettings as its only source of truth?
+
+Reply…
+Marco Martin left review comments 4 days ago
+
+--- COMMITS ---
+
+Ramil Nurmanov added 1 commit 4 days ago
+8f61d9d4 - systemtray: Test icon ordering through config changes
+Compare with previous version
+
+Ramil Nurmanov added 1 commit 4 days ago
+b52d9fe8 - systemtray: Move config model ownership to QML
+Compare with previous version
+
+Ramil Nurmanov resolved all threads 4 days ago
+Nate Graham approved this merge request 2 days ago
+
+Nov 20, 2026
+Ramil Nurmanov's avatar
+systemtray: Move config model ownership to QML
+Ramil Nurmanov authored 4 days ago
+b52d9fe8
+Ramil Nurmanov's avatar
+systemtray: Test icon ordering through config changes
+Ramil Nurmanov authored 4 days ago
+8f61d9d4
+Ramil Nurmanov's avatar
+systemtray: Animate horizontal movement when switching order modes
+Ramil Nurmanov authored 4 days ago
+cfe38d1a
+Nov 19, 2026
+Ramil Nurmanov's avatar
+use keepVisible
+Ramil Nurmanov authored 6 days ago
+1186e2fe
+Ramil Nurmanov's avatar
+systemtray: Use KeepFullVisible for search field
+Ramil Nurmanov authored 1 week ago
+d6de10cd
+Ramil Nurmanov's avatar
+systemtray: Avoid unnecessary Qt.binding() calls
+Ramil Nurmanov authored 1 week ago
+e8ccd0ef
+Ramil Nurmanov's avatar
+systemtray: Fix Tab order by restacking delegates
+Ramil Nurmanov authored 3 weeks ago and Ramil Nurmanov's avatar Ramil Nurmanov committed 5 days ago
+a758592f
+Ramil Nurmanov's avatar
+systemtray: Prioritize search field in entries header
+Ramil Nurmanov authored 4 weeks ago and Ramil Nurmanov's avatar Ramil Nurmanov committed 5 days ago
+8740bb29
+Ramil Nurmanov's avatar
+systemtray: Make entries header responsive
+Ramil Nurmanov authored 1 month ago and Ramil Nurmanov's avatar Ramil Nurmanov committed 5 days ago
+46c8cae3
+Ramil Nurmanov's avatar
+systemtray: Add reset button for manual icon order
+Ramil Nurmanov authored 1 month ago and Ramil Nurmanov's avatar Ramil Nurmanov committed 5 days ago
+c45cbe96
+Ramil Nurmanov's avatar
+systemtray: Preserve manual order when switching modes
+Ramil Nurmanov authored 1 month ago and Ramil Nurmanov's avatar Ramil Nurmanov committed 5 days ago
+c6e8cb8a
+Ramil Nurmanov's avatar
+systemtray: Explain search filter reset
+Ramil Nurmanov authored 1 month ago and Ramil Nurmanov's avatar Ramil Nurmanov committed 5 days ago
+c9b7a3a6
+Ramil Nurmanov's avatar
+systemtray: Explain disabled ListView key navigation
+Ramil Nurmanov authored 1 month ago and Ramil Nurmanov's avatar Ramil Nurmanov committed 5 days ago
+3f016f5a
+Ramil Nurmanov's avatar
+systemtray: Use ListView sections for category headers
+Ramil Nurmanov authored 1 month ago and Ramil Nurmanov's avatar Ramil Nurmanov committed 5 days ago
+e244f036
+Ramil Nurmanov's avatar
+systemtray: Simplify delegate tab order handling
+Ramil Nurmanov authored 1 month ago and Ramil Nurmanov's avatar Ramil Nurmanov committed 5 days ago
+06775d0d
+Ramil Nurmanov's avatar
+systemtray: Remove unnecessary ListView cacheBuffer
+Ramil Nurmanov authored 1 month ago and Ramil Nurmanov's avatar Ramil Nurmanov committed 5 days ago
+6fc45f19
+Ramil Nurmanov's avatar
+systemtray: Remove header tab order workaround
+Ramil Nurmanov authored 1 month ago and Ramil Nurmanov's avatar Ramil Nurmanov committed 5 days ago
+f0d95e05
+Ramil Nurmanov's avatar
+systemtray: Preserve notifications-first default order
+Ramil Nurmanov authored 1 month ago and Ramil Nurmanov's avatar Ramil Nurmanov committed 5 days ago
+2d974052
+Ramil Nurmanov's avatar
+systemtray: Restore InlineViewHeader for entries
+Ramil Nurmanov authored 1 month ago and Ramil Nurmanov's avatar Ramil Nurmanov committed 5 days ago
+36980c9a
+Ramil Nurmanov's avatar
+systemtray: Remove redundant Component wrappers
+Ramil Nurmanov authored 1 month ago and Ramil Nurmanov's avatar Ramil Nurmanov committed 5 days ago
+c9513c38
+Ramil Nurmanov's avatar
+systemtray: Use native tab navigation for entries
+Ramil Nurmanov authored 1 month ago and Ramil Nurmanov's avatar Ramil Nurmanov committed 5 days ago
+fbc1bd42
+Ramil Nurmanov's avatar
+systemtray: moved the model logic from QML to C++
+Ramil Nurmanov authored 1 month ago and Ramil Nurmanov's avatar Ramil Nurmanov committed 5 days ago
+2938a8ba
+Ramil Nurmanov's avatar
+systemtray: Make grouped state a property
+Ramil Nurmanov authored 1 month ago and Ramil Nurmanov's avatar Ramil Nurmanov committed 5 days ago
+79522094
+Ramil Nurmanov's avatar
+systemtray: Remove unused item reordering API
+Ramil Nurmanov authored 1 month ago and Ramil Nurmanov's avatar Ramil Nurmanov committed 5 days ago
+97c0e0f6
+Ramil Nurmanov's avatar
+remove comment: qmllint disable unqualified
+Ramil Nurmanov authored 2 months ago and Ramil Nurmanov's avatar Ramil Nurmanov committed 5 days ago
+1953baf2
+Ramil Nurmanov's avatar
+systemtray: Use native focus indicators
+Ramil Nurmanov authored 2 months ago and Ramil Nurmanov's avatar Ramil Nurmanov committed 5 days ago
+a8a2d9fe
+Ramil Nurmanov's avatar
+systemtray: Animate keyboard reordering
+Ramil Nurmanov authored 2 months ago and Ramil Nurmanov's avatar Ramil Nurmanov committed 5 days ago
+ac2e8b24
+Ramil Nurmanov's avatar
+systemtray: Delay SNI insertion until initial data is ready
+Ramil Nurmanov authored 2 months ago and Ramil Nurmanov's avatar Ramil Nurmanov committed 5 days ago
+5a55dbd7
+Ramil Nurmanov's avatar
+systemtray: Adapt keyboard navigation to Kirigami reordering
+Ramil Nurmanov authored 2 months ago and Ramil Nurmanov's avatar Ramil Nurmanov committed 5 days ago
+3888e58e
+Ramil Nurmanov's avatar
+systemtray: Use Kirigami keyboard reordering and add order modes
+Ramil Nurmanov authored 2 months ago and Ramil Nurmanov's avatar Ramil Nurmanov committed 5 days ago
+e8c733aa
+Ramil Nurmanov's avatar
+systemtray: Add keyboard controls to drag handle
+Ramil Nurmanov authored 2 months ago and Ramil Nurmanov's avatar Ramil Nurmanov committed 5 days ago
+f363d13b
+Ramil Nurmanov's avatar
+systemtray: Keep delegates alive while dragging
+Ramil Nurmanov authored 3 months ago and Ramil Nurmanov's avatar Ramil Nurmanov committed 5 days ago
+ef292902
+Ramil Nurmanov's avatar
+systemtray: Fix ordering of newly added items
+Ramil Nurmanov authored 3 months ago and Ramil Nurmanov's avatar Ramil Nurmanov committed 5 days ago
+570d122e
+Ramil Nurmanov's avatar
+systemtray: Preserve focus when reordering entries
+Ramil Nurmanov authored 3 months ago and Ramil Nurmanov's avatar Ramil Nurmanov committed 5 days ago
+f90277f3
+Ramil Nurmanov's avatar
+systemtray: Add keyboard-accessible reordering controls
+Ramil Nurmanov authored 3 months ago and Ramil Nurmanov's avatar Ramil Nurmanov committed 5 days ago
+d704dc7a
+Ramil Nurmanov's avatar
+systemtray: Use InOutCubic for item reordering
+Ramil Nurmanov authored 3 months ago and Ramil Nurmanov's avatar Ramil Nurmanov committed 5 days ago
+c0bce970
+Ramil Nurmanov's avatar
+systemtray: Fix ordering of duplicate tray items
+Ramil Nurmanov authored 3 months ago and Ramil Nurmanov's avatar Ramil Nurmanov committed 5 days ago
+cc897074
+Ramil Nurmanov's avatar
+systemtray: Handle items added while settings are open
+Ramil Nurmanov authored 3 months ago and Ramil Nurmanov's avatar Ramil Nurmanov committed 5 days ago
+93f408a8
+Ramil Nurmanov's avatar
+systemtray: Respect categories when resetting icon order
+Ramil Nurmanov authored 3 months ago and Ramil Nurmanov's avatar Ramil Nurmanov committed 5 days ago
+c9fa2faa
+Ramil Nurmanov's avatar
+systemtray: Allow manually reordering icons 
+Ramil Nurmanov authored 3 months ago and Ramil Nurmanov's avatar Ramil Nurmanov committed 5 days ago
+bfdb036d

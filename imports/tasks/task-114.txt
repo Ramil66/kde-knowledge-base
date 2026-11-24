@@ -1,0 +1,26 @@
+---
+id: task-114
+source: work
+copied: 2026-11-25
+---
+
+--- TASK ---
+
+kio: неправильная кодировка при ftp подключении в Dolphin
+Есть жалоба от пользователя, что на plasma 5 и plasma 6 при подключении к ftp в Dolphin неправильно отображается кодировка для названий файлов (вместо букв символы вопроса).
+
+Со слов пользователя - это не только в Dolphin, но и в Krusader.
+
+Скриншоты
+Значит скорее всего проблема где-то в KIO.
+
+--- LINKS ---
+
+Первый этап: https://invent.kde.org/frameworks/kio/-/merge_requests/2173 (принят)
+
+Второй этап (не принято):
+
+https://invent.kde.org/frameworks/kcodecs/-/merge_requests/110
+
+https://invent.kde.org/frameworks/kio/-/merge_requests/2175
+

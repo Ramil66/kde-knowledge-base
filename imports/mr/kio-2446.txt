@@ -1,45 +1,32 @@
+URL: https://invent.kde.org/frameworks/kio/-/merge_requests/2446
+COPIED: 2026-11-25
+
+--- OVERVIEW ---
+
 core: Add a reusable FuseMountJob
 Open
-core: Add a reusable FuseMountJob
+Ramil Nurmanovrequested to merge
  ramilnur/kio:feature/fuse-mount-job
 into
 master
+1 month ago
 Overview 
 9
 Commits 
-3
+4
 Pipelines 
-8
+9
 Reports 
-0
+2
 Changes 
 8
-2
-2 open threads
+1
+1 open thread
 Add KIO::FuseMountJob to expose remote URLs as local paths through kio-fuse, with configurable timeouts and error reporting.
 
 Use it in FilePreviewJob to replace the direct D-Bus calls.
 
-Merge request reports
-Members who can merge are allowed to add commits.
-Merge request pipeline #1401216 passed
-
-Merge request pipeline passed for 948dec94 3 weeks ago
-
-Test coverage 63.00% (1.00%) from 2 jobs 
-Approved by
-Méven Car
-Merge blocked: 2 checks failed
-Open threads must be resolved.
-Merge conflicts must be resolved.
-Merge details
-
-The source branch is
-205 commits behind
-the target branch.
-Source branch will be rebased without pipeline.
-3 commits will be added to master.
-Source branch will be deleted.
+--- ACTIVITY ---
 Activity
 Ramil Nurmanov mentioned in merge request utilities/ark!348 1 month ago
 Méven Car
@@ -190,13 +177,14 @@ Hi @meven , all review feedback has been addressed. Could you take another look 
 Méven Car
 Méven Car
 @meven
-10 hours ago
+14 hours ago
 Developer
 Conflict: This file was modified in both the source and target branches
 
 Reply…
 Méven Car
-Méven Car @meven started a thread on the diff 8 hours ago
+Méven Car @meven started a thread on an old version of the diff 12 hours ago
+Resolved 3 hours ago by Ramil Nurmanov
 src/core/fusemountjob.h  0 → 100644
  * If kio-fuse is not available, the job fails with KIO::ERR_UNSUPPORTED_ACTION,
  * which lets callers fall back to another approach, e.g. copying the file.
@@ -217,8 +205,38 @@ src/core/fusemountjob.h  0 → 100644
 Méven Car
 Méven Car
 @meven
-8 hours ago
+13 hours ago
 Developer
 Suggested change 
+Applied
  * \since 6.32
  * \since 6.33
+Ramil Nurmanov
+changed this line in version 8 of the diff 4 hours ago 
+Reply…
+Méven Car approved this merge request 12 hours ago
+Ramil Nurmanov added 1 commit 3 hours ago
+ec0ba572 - Apply 1 suggestion(s) to 1 file(s)
+Compare with previous version
+
+--- COMMITS ---
+
+Nov 24, 2026
+Ramil Nurmanov's avatar
+Apply 1 suggestion(s) to 1 file(s) 
+Ramil Nurmanov authored 4 hours ago
+ec0ba572
+Nov 02, 2026
+Ramil Nurmanov's avatar
+core: Port DesktopExecParser to FuseMountJob
+Ramil Nurmanov authored 1 month ago
+948dec94
+Oct 05, 2026
+Ramil Nurmanov's avatar
+gui: Port FilePreviewJob to FuseMountJob
+Ramil Nurmanov authored 1 month ago
+3698d17d
+Ramil Nurmanov's avatar
+core: Add a reusable FuseMountJob
+Ramil Nurmanov authored 1 month ago
+1a3bed1e

@@ -1,0 +1,78 @@
+---
+id: task-120
+source: work
+copied: 2026-11-25
+---
+
+--- TASK ---
+
+KDE: возможность перемещать иконки в трее
+Описание
+В Windows можно перемещать (по крайней мере, можно было) иконки мышкой, то есть управлять порядком / положением иконки в трее вручную. В KDE к сожалению их порядок фиксирован.
+
+Постановка задачи
+Реализовать возможность управлять порядком и положением иконки в трее панели задач.
+
+--- LINKS ---
+
+https://bugs.kde.org/show_bug.cgi?id=524394
+
+https://invent.kde.org/plasma/plasma-workspace/-/merge_requests/6958
+
+--- BUGZILLA ---
+
+Bug 524394
+System Tray: add support for manually reordering icons(edit)
+Status:	RESOLVED DUPLICATE of bug 384782 (edit)
+Alias:	None (edit)
+
+plasmashell
+
+System Tray widget
+ (other bugs)
+
+master
+
+Other
+ 
+Linux
+:	NOR wishlist
+1.0
+Plasma Bugs List (edit) (take)
+Depends on:	
+Blocks:	
+Reported:	2026-08-18 07:32 UTC by Ramil
+Modified:	2026-08-18 16:16 UTC (History)
+ 
+2 users (edit)
+ (never email me about this bug)
+(add)
+
+Attachments
+Add an attachment
+
+:
+Comment
+Preview
+
+Status:	
+
+RESOLVED
+ 
+DUPLICATE
+ of bug 384782 (edit)
+reply[−]
+Description
+Ramil
+2026-08-18 07:32:03 UTC
+Allow users to manually change the order of icons in the System Tray.
+
+Currently, System Tray icons have a fixed order determined by Plasma. It would be useful to allow users to rearrange them manually, similar to how task manager items or panel widgets can be reordered.
+
+The exact interaction could be decided separately, for example by allowing drag-and-drop directly or only while the panel is in Edit Mode.
+reply[−]
+Comment 1
+Nate Graham
+2026-08-18 16:16:07 UTC
+
+*** This bug has been marked as a duplicate of bug 384782 ***
