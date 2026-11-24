@@ -72,14 +72,14 @@ def parse(content: str, fmt: Format) -> object:
     raise CatalogError("No structured fields. Attach this original with document link.")
 
 
-def import_document(
+def preserve_document(
     conn: Connection,
     kind: Kind,
     fmt: Format,
     content: str,
     source_url: str | None = None,
     filename: str | None = None,
-) -> ImportResult:
+) -> int:
     key = {
         "document_type": kind,
         "format": fmt,
@@ -96,6 +96,18 @@ def import_document(
             key | {"content": content, "metadata": {"filename": filename} if filename else {}},
         )
     )
+    return document_id
+
+
+def import_document(
+    conn: Connection,
+    kind: Kind,
+    fmt: Format,
+    content: str,
+    source_url: str | None = None,
+    filename: str | None = None,
+) -> ImportResult:
+    document_id = preserve_document(conn, kind, fmt, content, source_url, filename)
     if kind == "diff":
         return ImportResult(document_id, None, "Original diff stored")
     model, table = {
@@ -103,14 +115,13 @@ def import_document(
         "task": (Task, m.tasks),
         "mr": (MergeRequest, m.merge_requests),
     }[kind]
-    if existing is not None:
-        for link in rows(conn, m.document_links, document_id=document_id):
-            if link[link_column(table)] is not None:
-                return ImportResult(document_id, link[link_column(table)], "Already linked")
+    for link in rows(conn, m.document_links, document_id=document_id):
+        if link[link_column(table)] is not None:
+            return ImportResult(document_id, link[link_column(table)], "Already linked")
     try:
         item = model.model_validate(parse(content, fmt))
         with conn.begin_nested():
-            entity_id = store(conn, item)
+            entity_id = store(conn, item, document_id=document_id, source=f"document:{document_id}")
             attach(conn, document_id, table, entity_id)
     except (ValueError, OverflowError, RecursionError, yaml.YAMLError, IntegrityError) as exc:
         logging.getLogger(__name__).info(

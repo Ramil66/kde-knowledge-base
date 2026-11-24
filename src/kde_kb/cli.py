@@ -26,7 +26,8 @@ from .database import (
     transaction,
 )
 from .exporters import export_json
-from .importers import Format, Kind, detect_format, import_document
+from .extraction import confirm_document, document_list, inspect_document
+from .importers import Format, Kind, detect_format, import_document, preserve_document
 from .retrieval import search
 from .schemas import MergeRequest, Repository, Task
 
@@ -135,9 +136,15 @@ def repo_list(ctx: typer.Context) -> None:
 
 
 @repo.command("show")
-def repo_show(ctx: typer.Context, ref: str) -> None:
+def repo_show(
+    ctx: typer.Context, ref: str, full: bool = False, depth: int = 2, limit: int = 20
+) -> None:
     with transaction(ctx.obj) as conn:
-        output(svc.with_documents(conn, m.repositories, svc.resolve_repo(conn, ref)))
+        output(
+            svc.repo_detail(conn, ref, depth, limit)
+            if full
+            else svc.with_documents(conn, m.repositories, svc.resolve_repo(conn, ref))
+        )
 
 
 @repo.command("update")
@@ -207,9 +214,26 @@ def task_list(ctx: typer.Context) -> None:
 
 
 @task.command("show")
-def task_show(ctx: typer.Context, ref: str) -> None:
+def task_show(ctx: typer.Context, ref: str, depth: int = 2, limit: int = 20) -> None:
     with transaction(ctx.obj) as conn:
-        output(svc.task_detail(conn, ref))
+        output(svc.task_detail(conn, ref, depth, limit))
+
+
+@task.command("history")
+def task_history(ctx: typer.Context, ref: str) -> None:
+    with transaction(ctx.obj) as conn:
+        output(svc.rows(conn, m.task_events, task_id=svc.resolve_task(conn, ref)["id"]))
+
+
+@task.command("link-mr")
+def task_link_mr(ctx: typer.Context, ref: str, repository: str, number: int) -> None:
+    with transaction(ctx.obj, write=True) as conn:
+        svc.link_mr(
+            conn,
+            svc.resolve_task(conn, ref)["id"],
+            svc.mr_record(conn, repository, number)["id"],
+            "manual",
+        )
 
 
 @task.command("update")
@@ -219,6 +243,7 @@ def task_update(
     title: str | None = None,
     description: str | None = None,
     status: str | None = None,
+    priority: str | None = None,
     solution_summary: str | None = None,
 ) -> None:
     with transaction(ctx.obj, write=True) as conn:
@@ -230,6 +255,7 @@ def task_update(
                 title=title,
                 description=description,
                 status=status,
+                priority=priority,
                 solution_summary=solution_summary,
             ),
         )
@@ -287,9 +313,9 @@ def mr_list(ctx: typer.Context, repo: str | None = None) -> None:
 
 
 @mr.command("show")
-def mr_show(ctx: typer.Context, repository: str, number: int) -> None:
+def mr_show(ctx: typer.Context, repository: str, number: int, local: bool = False) -> None:
     with transaction(ctx.obj) as conn:
-        output(svc.mr_detail(conn, repository, number))
+        output(svc.mr_detail(conn, repository, number, local=local))
 
 
 @mr.command("update")
@@ -336,6 +362,7 @@ def import_command(kind: Kind) -> Callable[..., None]:
         file: Path | None = None,
         stdin: bool = False,
         fmt: Annotated[FileFormat | None, typer.Option("--format")] = None,
+        extract: bool = False,
         source_url: str | None = None,
     ) -> None:
         """Import a UTF-8 file or pasted text from stdin."""
@@ -346,6 +373,12 @@ def import_command(kind: Kind) -> Callable[..., None]:
         )
         filename = file.name if file is not None else None
         file_format = cast(Format, fmt.value) if fmt else detect_format(filename, kind, content)
+        if extract:
+            with transaction(ctx.obj, write=True) as conn:
+                uid = preserve_document(conn, kind, file_format, content, source_url, filename)
+            typer.echo(f"Original document: {uid}", err=True)
+            output(inspect_document(ctx.obj, uid))
+            return
         with transaction(ctx.obj, write=True) as conn:
             result = import_document(conn, kind, file_format, content, source_url, filename)
         output(asdict(result))
@@ -361,6 +394,29 @@ class Entity(StrEnum):
     repo = "repo"
     task = "task"
     mr = "mr"
+
+
+@document.command("list")
+def list_documents(ctx: typer.Context, unprocessed: bool = False) -> None:
+    with transaction(ctx.obj) as conn:
+        output(document_list(conn, unprocessed))
+
+
+@document.command("extract")
+def extract_document(
+    ctx: typer.Context,
+    document_id: int,
+    dry_run: bool = False,
+    confirm: bool = False,
+    refresh: bool = False,
+) -> None:
+    if confirm and (dry_run or refresh):
+        raise CatalogError("Use --confirm on its own to apply the saved proposal")
+    output(
+        confirm_document(ctx.obj, document_id)
+        if confirm
+        else inspect_document(ctx.obj, document_id, dry_run=dry_run, refresh=refresh)
+    )
 
 
 @document.command("link")

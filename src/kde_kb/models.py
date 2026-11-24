@@ -44,10 +44,7 @@ def fk(
 
 
 def timestamps() -> tuple[Column, Column]:
-    return tuple(
-        Column(name, Text, nullable=False, server_default=text("CURRENT_TIMESTAMP"))
-        for name in ("created_at", "updated_at")
-    )
+    return string("created_at"), string("updated_at")
 
 
 repositories = Table(
@@ -85,6 +82,7 @@ tasks = Table(
             "source",
             "type",
             "status",
+            "external_status",
             "priority",
             "reproduction_steps",
             "actual_behavior",
@@ -108,7 +106,14 @@ branches = Table(
     string("source_repository_url", required=True),
     *(
         string(k)
-        for k in ("base_branch", "base_commit", "head_commit", "status", "solution_summary")
+        for k in (
+            "base_branch",
+            "base_commit",
+            "head_commit",
+            "status",
+            "external_status",
+            "solution_summary",
+        )
     ),
     *timestamps(),
     UniqueConstraint("repository_id", "source_repository_url", "name"),
@@ -139,10 +144,10 @@ merge_requests = Table(
     "merge_requests",
     metadata,
     pk(),
-    fk("branch_id", "branches"),
+    fk("branch_id", "branches", optional=True),
     fk("target_repository_id", "repositories"),
     fk("author_id", "users", optional=True),
-    Column("external_id", Integer, nullable=False),
+    Column("external_id", Integer),
     string("title", required=True),
     Column("is_draft", Boolean),
     *(
@@ -153,6 +158,7 @@ merge_requests = Table(
             "source_branch",
             "target_branch",
             "status",
+            "external_status",
             "pipeline_status",
             "merged_at",
             "closed_at",
@@ -170,6 +176,7 @@ discussions = Table(
     pk(),
     fk("merge_request_id", "merge_requests", cascade=True),
     string("external_id"),
+    Column("local_key", Text, unique=True),
     Column("is_resolved", Boolean),
     string("created_at"),
     string("resolved_at"),
@@ -184,6 +191,7 @@ comments = Table(
     fk("author_id", "users", optional=True),
     Column("parent_comment_id", Integer),
     string("external_id"),
+    Column("local_key", Text, unique=True),
     string("body", required=True),
     string("summary"),
     string("category"),
@@ -270,6 +278,9 @@ task_events = Table(
     string("event_type", required=True),
     string("description"),
     string("created_at"),
+    string("previous_value"),
+    string("new_value"),
+    string("source"),
 )
 test_runs = Table(
     "test_runs",
@@ -319,4 +330,58 @@ document_links = Table(
         UniqueConstraint("document_id", key)
         for key in ("repository_id", "task_id", "merge_request_id")
     ),
+)
+
+task_merge_requests = Table(
+    "task_merge_requests",
+    metadata,
+    fk("task_id", "tasks", primary=True, cascade=True),
+    fk("merge_request_id", "merge_requests", primary=True, cascade=True),
+)
+
+mr_revisions = Table(
+    "mr_revisions",
+    metadata,
+    pk(),
+    fk("merge_request_id", "merge_requests", cascade=True),
+    string("base_sha"),
+    string("start_sha"),
+    string("head_sha"),
+    fk("source_document_id", "raw_documents", optional=True),
+    string("created_at"),
+    string("kind", required=True),
+)
+
+revision_commits = Table(
+    "revision_commits",
+    metadata,
+    fk("revision_id", "mr_revisions", primary=True, cascade=True),
+    fk("commit_id", "commits", primary=True),
+)
+
+legacy_values = Table(
+    "legacy_values",
+    metadata,
+    Column("entity", Text, primary_key=True),
+    Column("entity_id", Integer, primary_key=True),
+    Column("field", Text, primary_key=True),
+    string("original", required=True),
+)
+
+document_extractions = Table(
+    "document_extractions",
+    metadata,
+    pk(),
+    Column(
+        "document_id",
+        Integer,
+        ForeignKey("raw_documents.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+    string("model", required=True),
+    string("prompt_version", required=True),
+    Column("proposal", JSON, nullable=False),
+    string("status", required=True),
+    string("created_at", required=True),
 )

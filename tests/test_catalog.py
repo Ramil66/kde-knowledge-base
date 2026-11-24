@@ -8,7 +8,15 @@ from sqlalchemy.exc import IntegrityError
 
 from kde_kb import models as m
 from kde_kb import services as s
-from kde_kb.database import CatalogError, backup, config, migrate_database, revision, transaction
+from kde_kb.database import (
+    CatalogError,
+    backup,
+    config,
+    head,
+    migrate_database,
+    revision,
+    transaction,
+)
 from kde_kb.exporters import export_json
 from kde_kb.importers import detect_format, import_document
 from kde_kb.retrieval import search
@@ -35,7 +43,7 @@ def test_migrations(db: Path) -> None:
         assert not conn.exec_driver_sql("SELECT name FROM sqlite_master WHERE type='trigger'").all()
     migrate_database(db)
     with transaction(db) as conn:
-        assert revision(conn) == "0001"
+        assert revision(conn) == head()
 
 
 def test_examples_and_replay(db: Path) -> None:
@@ -202,7 +210,10 @@ def test_incremental_history_and_relations(db: Path) -> None:
             "depends_on": ["invent:20"],
         }
         result = import_document(conn, "task", "json", json.dumps(payload))
-        assert s.task_detail(conn, f"#{result.entity_id}")["events"][0]["event_type"] == "tested"
+        assert [e["event_type"] for e in s.task_detail(conn, f"#{result.entity_id}")["events"]] == [
+            "created",
+            "tested",
+        ]
         payload = {
             "repo": "kio",
             "external_id": 1,

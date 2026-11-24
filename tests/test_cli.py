@@ -50,3 +50,25 @@ def test_workflow(tmp_path: Path) -> None:
     assert (
         json.loads(destination.read_text())["tables"]["raw_documents"][0]["content"] == raw.decode()
     )
+
+    config = tmp_path / "offline.toml"
+    config.write_text('[llm]\nprovider = "disabled"\n')
+    env["KDE_KB_CONFIG"] = str(config)
+    page = b"Bug 42: Sample title\r\n"
+    failure = run("import", "task", "--stdin", "--extract", data=page, check=False)
+    assert failure.returncode and b"disabled" in failure.stderr
+    pending = json.loads(run("document", "list", "--unprocessed").stdout)
+    uid = str(next(doc["id"] for doc in pending if doc["document_type"] == "task"))
+    assert run("document", "show", uid).stdout == page
+    run("task", "add", "--title", "Sample title", "--external-id", "42", "--source", "bugzilla")
+    run("task", "update", "42", "--priority", "high")
+    run("task", "link-branch", "42", "kio", "topic")
+    assert [event["event_type"] for event in json.loads(run("task", "history", "42").stdout)] == [
+        "created",
+        "priority_changed",
+        "branch_linked",
+    ]
+    assert (
+        json.loads(run("repo", "show", "kio", "--full", "--limit", "1").stdout)["tasks"][0]["title"]
+        == "Sample title"
+    )

@@ -1,10 +1,20 @@
 from __future__ import annotations
 
 import re
+from datetime import UTC, datetime
 from typing import Annotated, Literal, Self
 from urllib.parse import urlsplit, urlunsplit
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, PositiveInt, model_validator
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    PlainSerializer,
+    PositiveInt,
+    model_validator,
+)
 
 
 def nonblank(value: str) -> str:
@@ -46,6 +56,23 @@ RepositoryURL = Annotated[str, AfterValidator(canonical_url)]
 TaskType = Literal["bug", "feature", "refactoring", "documentation", "research", "other"]
 
 
+def parse_date(value: object) -> datetime:
+    if isinstance(value, str):
+        value = datetime.fromisoformat(value)
+    if not isinstance(value, datetime) or value.utcoffset() is None:
+        raise ValueError("Expected an ISO 8601 timestamp with a time zone")
+    return value.astimezone(UTC)
+
+
+Date = Annotated[
+    datetime,
+    BeforeValidator(parse_date),
+    PlainSerializer(
+        lambda value: value.isoformat().replace("+00:00", "Z"), return_type=str, when_used="json"
+    ),
+]
+
+
 class Input(BaseModel):
     model_config = ConfigDict(extra="forbid", coerce_numbers_to_str=True)
 
@@ -53,7 +80,7 @@ class Input(BaseModel):
 class TaskEvent(Input):
     event_type: Name
     description: str | None = None
-    created_at: str | None = None
+    created_at: Date | None = None
 
 
 class TestRun(Input):
@@ -61,7 +88,7 @@ class TestRun(Input):
     result: Name
     revision: str | None = None
     output: str | None = None
-    created_at: str | None = None
+    created_at: Date | None = None
 
 
 class MRReference(Input):
@@ -71,8 +98,8 @@ class MRReference(Input):
 
 class Repository(Input):
     depends_on: list[Name] = Field(default_factory=list)
-    created_at: str | None = None
-    updated_at: str | None = None
+    created_at: Date | None = None
+    updated_at: Date | None = None
     name: Name
     url: RepositoryURL
     namespace: str | None = None
@@ -87,8 +114,8 @@ class Repository(Input):
 class Task(Input):
     depends_on: list[Name] = Field(default_factory=list)
     events: list[TaskEvent] = Field(default_factory=list)
-    created_at: str | None = None
-    updated_at: str | None = None
+    created_at: Date | None = None
+    updated_at: Date | None = None
     title: Name
     description: str | None = None
     external_id: Name | None = None
@@ -101,7 +128,7 @@ class Task(Input):
     actual_behavior: str | None = None
     expected_behavior: str | None = None
     solution_summary: str | None = None
-    completed_at: str | None = None
+    completed_at: Date | None = None
 
     @model_validator(mode="after")
     def check_source(self) -> Self:
@@ -138,21 +165,22 @@ class Position(Input):
 
 
 class Comment(Input):
-    external_id: Name
+    external_id: Name | None = None
+    parent_index: Annotated[int, Field(ge=0)] | None = None
     body: str
     author: User | None = None
     parent_external_id: Name | None = None
     url: str | None = None
-    created_at: str | None = None
-    updated_at: str | None = None
+    created_at: Date | None = None
+    updated_at: Date | None = None
     position: Position | None = None
 
 
 class Discussion(Input):
-    external_id: Name
+    external_id: Name | None = None
     is_resolved: bool | None = None
-    created_at: str | None = None
-    resolved_at: str | None = None
+    created_at: Date | None = None
+    resolved_at: Date | None = None
     comments: list[Comment] = Field(default_factory=list)
 
 
@@ -176,30 +204,48 @@ class Commit(Input):
     repository: Name
     message: str | None = None
     author: User | None = None
-    authored_at: str | None = None
-    committed_at: str | None = None
+    authored_at: Date | None = None
+    committed_at: Date | None = None
     url: str | None = None
     summary: str | None = None
     changed_files: list[ChangedFile] = Field(default_factory=list)
 
 
-class MergeRequest(MRReference):
+class Revision(Input):
+    complete: bool = False
+    base_sha: Name | None = None
+    start_sha: Name | None = None
+    head_sha: Name | None = None
+
+
+class MergeRequest(Input):
+    repo: Name
+    external_id: Annotated[PositiveInt, Field(le=2**63 - 1)] | None = None
+    revision: Revision | None = None
+    tasks: list[Name] = Field(default_factory=list)
+    branch_status: Name | None = None
     depends_on: list[MRReference] = Field(default_factory=list)
     test_runs: list[TestRun] = Field(default_factory=list)
     title: Name
-    source_branch: Name
-    source_repository_url: RepositoryURL
+    source_branch: Name | None = None
+    source_repository_url: RepositoryURL | None = None
     target_branch: Name | None = None
     url: str | None = None
     description: str | None = None
     status: Name | None = None
     is_draft: bool | None = None
     pipeline_status: str | None = None
-    created_at: str | None = None
-    updated_at: str | None = None
-    merged_at: str | None = None
-    closed_at: str | None = None
+    created_at: Date | None = None
+    updated_at: Date | None = None
+    merged_at: Date | None = None
+    closed_at: Date | None = None
     resolution_summary: str | None = None
     author: User | None = None
     discussions: list[Discussion] = Field(default_factory=list)
     commits: list[Commit] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def check_snapshot(self) -> Self:
+        if self.revision and self.revision.complete and "commits" not in self.model_fields_set:
+            raise ValueError("A complete revision requires an explicit commits array")
+        return self

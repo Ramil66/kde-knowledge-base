@@ -45,7 +45,7 @@ def transaction(
     @event.listens_for(engine, "connect")
     def configure(dbapi: sqlite3.Connection, _record: object) -> None:
         dbapi.isolation_level = None
-        dbapi.execute("PRAGMA foreign_keys=ON")
+        dbapi.execute("PRAGMA foreign_keys=OFF" if migrate else "PRAGMA foreign_keys=ON")
 
     try:
         with engine.begin() as conn:
@@ -53,6 +53,8 @@ def transaction(
             if check_revision and not migrate and revision(conn) != head():
                 raise CatalogError("Database revision is out of date. Run kde-kb db migrate.")
             yield conn
+            if migrate and conn.exec_driver_sql("PRAGMA foreign_key_check").first():
+                raise CatalogError("Migration failed referential integrity checks")
     finally:
         engine.dispose()
 
