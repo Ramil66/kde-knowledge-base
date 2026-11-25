@@ -9,7 +9,8 @@ import yaml
 
 from .database import CatalogError
 from .importers import DocumentLoader
-from .schemas import Comment, Discussion, MergeRequest, Repository, Task, User
+from .invent import SourceComment, hydrate, parse_page
+from .schemas import MergeRequest, Repository, Task, User
 
 MR_URL = re.compile(r"https?://invent\.kde\.org/(.+?)/-/merge_requests/(\d+)")
 SHORT_MR = re.compile(r"(?:(?P<project>[\w.-]+(?:/[\w.-]+)*)!)?(?P<number>\d+)$")
@@ -58,6 +59,20 @@ def parse_mr(text: str, filename: str | None = None) -> dict[str, Any]:
             text,
         )
     )
+    if not sections:
+        return {
+            "record": None,
+            "repository": None,
+            "bug_ids": [],
+            "related_mrs": [],
+            "mr_references": [],
+            "sections": [],
+            "empty_template": True,
+        }
+    page = parse_page(text, url or None)
+    page_comments = [SourceComment.model_validate(item) for item in page["source_comments"]]
+    hydrated_record: dict[str, Any] = {}
+    hydrate(hydrated_record, None, page_comments, text)
     overview = sections.get("OVERVIEW", "")
     lines = [line.strip() for line in overview.splitlines()]
     title = next(
@@ -100,12 +115,18 @@ def parse_mr(text: str, filename: str | None = None) -> dict[str, Any]:
         overview,
     )
     description = description_match[1].strip() if description_match else None
-    commit_author = None
-    author_match = re.search(r"(?m)^([^\n]+) authored? \d+ ", sections.get("COMMITS", ""))
-    if author_match:
-        commit_author = User(
-            username=re.sub(r"[^\w.-]", "", author_match[1].split()[-1]), platform="invent"
-        )
+    commit_author = (
+        User.model_validate(page["record"]["author"]) if page["record"].get("author") else None
+    )
+    if commit_author is None:
+        author_match = re.search(r"(?m)^([^\n]+) authored? \d+ ", sections.get("COMMITS", ""))
+        if author_match:
+            author_name = author_match[1].split(" authored", 1)[0].strip()
+            commit_author = User(
+                username=re.sub(r"[^\w.-]", "", author_name.replace("'s avatar", "")),
+                platform="invent",
+                display_name=author_name,
+            )
     commits = []
     commit_text = sections.get("COMMITS", "")
     commit_lines = commit_text.splitlines()
@@ -133,53 +154,6 @@ def parse_mr(text: str, filename: str | None = None) -> dict[str, Any]:
                     )
     # The compact summary and detailed history repeat current commit entries.
     commits = list({commit["sha"]: commit for commit in commits}.values())
-    # Parse visible discussion entries into source spans, without copying them through an LLM.
-    comments = []
-    activity = sections.get("ACTIVITY", "")
-    activity_lines = activity.splitlines()
-    activity_marker = re.search(r"(?m)^--- ACTIVITY ---\s*$", text)
-    activity_first_line = text[: activity_marker.end()].count("\n") + 2 if activity_marker else 1
-    authors = [
-        (i, re.fullmatch(r"@([\w.-]+)", line.strip())) for i, line in enumerate(activity_lines)
-    ]
-    authors = [
-        (i, author)
-        for i, author in authors
-        if author
-        and i + 1 < len(activity_lines)
-        and re.search(r"ago|yesterday|today", activity_lines[i + 1], re.IGNORECASE)
-    ]
-    for index, (line_index, activity_author) in enumerate(authors):
-        start = line_index + 2
-        while start < len(activity_lines) and activity_lines[start].strip() in {
-            "Developer",
-            "Author",
-            "Contributor",
-            "Maintainer",
-        }:
-            start += 1
-        end = authors[index + 1][0] if index + 1 < len(authors) else len(activity_lines)
-        while start < end and not activity_lines[start].strip():
-            start += 1
-        while start < end and (
-            not activity_lines[end - 1].strip()
-            or activity_lines[end - 1].strip() in {"Reply…", "Reply..."}
-        ):
-            end -= 1
-        body_lines = activity_lines[start:end]
-        body = "\n".join(body_lines).strip()
-        if body:
-            start_line = activity_first_line + start
-            end_line = start_line + len(body.splitlines()) - 1
-            comments.append(
-                Comment(
-                    external_id=f"source:{activity_first_line + line_index}",
-                    body=body,
-                    author=User(username=activity_author[1], platform="invent"),
-                    source_start_line=start_line,
-                    source_end_line=end_line,
-                ).model_dump(mode="json", exclude_none=True)
-            )
     bugs = list(dict.fromkeys(int(n) for n in re.findall(r"\bBUG:\s*(\d+)", overview)))
     relation_by_ref = {}
     for line in overview.splitlines():
@@ -209,21 +183,9 @@ def parse_mr(text: str, filename: str | None = None) -> dict[str, Any]:
             source_repository_url=fork_url,
             status=status,
             description=description,
+            url=url or None,
             author=commit_author,
-            discussions=(
-                [
-                    Discussion(
-                        external_id="source:activity",
-                        is_resolved=(
-                            "All threads resolved!" in overview
-                            or "All threads resolved!" in activity
-                        ),
-                        comments=comments,
-                    )
-                ]
-                if comments
-                else []
-            ),
+            discussions=hydrated_record.get("discussions", []),
             commits=commits,
         ).model_dump(mode="json", exclude_none=True),
         "repository": Repository(name=project.rsplit("/", 1)[-1], url=repo_url).model_dump(),

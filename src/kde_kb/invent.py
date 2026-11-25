@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pydantic import Field, PositiveInt
 
 from .database import CatalogError
-from .schemas import Input, User
+from .schemas import Input, ReviewLocation, User
 
 PARSER_VERSION = "invent-1"
 LINK = re.compile(r"https?://[^\s<>\"\]]+")
@@ -23,6 +23,7 @@ EVENT = re.compile(
     r"^(?:Edited .+ ago by |.* (?:mentioned in merge request |added (?:\d+ commits?\b|$)|(?:un)?approved this merge request|resolved all threads|changed this line in version |started a thread on ))"
 )
 REPLY = {"Reply…", "Reply...", "Reply"}
+UI_ONLY = {"Suggested change", "Applied", "Compare with previous version", *REPLY}
 BRANCH = r"[\w./+-]+"
 
 
@@ -33,7 +34,13 @@ class Lines(Input):
     def read(self, lines: list[str]) -> str:
         if not self.first <= self.last <= len(lines):
             raise CatalogError("Invalid source line range")
-        return "".join(lines[self.first - 1 : self.last]).removesuffix("\n").removesuffix("\r")
+        return (
+            "".join(
+                line for line in lines[self.first - 1 : self.last] if line.strip() not in UI_ONLY
+            )
+            .removesuffix("\n")
+            .removesuffix("\r")
+        )
 
 
 class SourceComment(Input):
@@ -45,6 +52,7 @@ class SourceComment(Input):
     external_id: str | None = None
     url: str | None = None
     categories: list[str] = Field(default_factory=list)
+    review_locations: list[ReviewLocation] = Field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -214,6 +222,11 @@ def parse_page(content: str, source_url: str | None) -> dict:
     thread = 0
     active_thread = False
     previous_stop = begin
+    thread_locations = {}
+    path_pattern = re.compile(
+        r"^\s*((?:[\w.@+-]+/)+[\w.@+-]+\.(?:c|cc|cpp|h|hh|hpp|qml|js|py|cmake|txt))\s*(?:[\d+→ -]*)$",
+        re.IGNORECASE,
+    )
     for index, h in enumerate(headers):
         gap = lines[previous_stop : h.start]
         if any(line in REPLY or EVENT.match(line) for line in gap):
@@ -221,6 +234,35 @@ def parse_page(content: str, source_url: str | None) -> dict:
         if not active_thread:
             thread += 1
         active_thread |= h.resolved or any("started a thread on " in line for line in gap)
+        path_match = next(
+            (
+                (offset, match)
+                for offset, line in enumerate(gap)
+                if (match := path_pattern.fullmatch(line))
+            ),
+            None,
+        )
+        if path_match:
+            offset, path = path_match
+            range_match = re.search(
+                r"Comment on lines\s+[+-]?(\d+)(?:\s+to\s+[+-]?(\d+))?",
+                "\n".join(gap),
+                re.IGNORECASE,
+            )
+            context_lines = []
+            for line in gap[offset + 1 :]:
+                if not line.strip() or line in REPLY or EVENT.match(line):
+                    break
+                context_lines.append(line)
+                if len(context_lines) == 12:
+                    break
+            location = ReviewLocation(
+                path=path[1],
+                start_line=int(range_match[1]) if range_match else None,
+                end_line=int(range_match[2] or range_match[1]) if range_match else None,
+                code_context="\n".join(context_lines) or None,
+            )
+            thread_locations.setdefault(thread, []).append(location)
         end = headers[index + 1].start if index + 1 < len(headers) else len(lines)
         stop = end
         fenced = False
@@ -249,6 +291,7 @@ def parse_page(content: str, source_url: str | None) -> dict:
                 else None,
                 url=h.note_url,
                 external_id=h.note_url.split("note_")[-1] if h.note_url else None,
+                review_locations=thread_locations.get(thread, []),
             )
             comments.append(ref)
         if "Author" in h.roles:
@@ -275,6 +318,11 @@ def hydrate(
         comment = {
             "body": ref.lines.read(lines),
             "author": ref.author.model_dump(exclude_none=True),
+            "source_start_line": ref.lines.first,
+            "source_end_line": ref.lines.last,
+            "review_locations": [
+                location.model_dump(exclude_none=True) for location in ref.review_locations
+            ],
         }
         if ref.external_id:
             comment["external_id"] = ref.external_id
@@ -288,6 +336,10 @@ def hydrate(
         if ref.resolved:
             resolved.add(ref.thread)
     record["discussions"] = [
-        {"comments": group, **({"is_resolved": True} if thread in resolved else {})}
+        {
+            "external_id": f"source-thread:{thread}",
+            "comments": group,
+            **({"is_resolved": True} if thread in resolved else {}),
+        }
         for thread, group in discussions.items()
     ]

@@ -164,6 +164,13 @@ class Position(Input):
         return self
 
 
+class ReviewLocation(Input):
+    path: Name
+    start_line: PositiveInt | None = None
+    end_line: PositiveInt | None = None
+    code_context: str | None = None
+
+
 class Comment(Input):
     category: Name | None = None
     external_id: Name | None = None
@@ -177,6 +184,7 @@ class Comment(Input):
     position: Position | None = None
     source_start_line: PositiveInt | None = None
     source_end_line: PositiveInt | None = None
+    review_locations: list[ReviewLocation] = Field(default_factory=list)
 
 
 class Discussion(Input):

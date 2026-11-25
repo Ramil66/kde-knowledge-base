@@ -12,9 +12,11 @@ from sqlalchemy.dialects.sqlite import insert
 from . import models as m
 from . import services as svc
 from .database import CatalogError, transaction
-from .extraction import confirm_document, inspect_document
+from .extraction import inspect_document
 from .import_documents import parse_mr, parse_task
 from .importers import preserve_document
+from .invent import Lines
+from .providers import LLMProvider
 from .schemas import MergeRequest, Repository, Task
 
 
@@ -23,6 +25,7 @@ def batch_import(
     root: Path,
     *,
     extract: bool = False,
+    provider: LLMProvider | None = None,
     dry_run: bool = False,
     progress=lambda _: None,
 ) -> dict:
@@ -33,10 +36,12 @@ def batch_import(
         "created": 0,
         "skipped": 0,
         "errors": 0,
+        "empty_templates": 0,
         "links": 0,
         "llm_calls": 0,
         "input_tokens": 0,
         "output_tokens": 0,
+        "classified_comments": 0,
         "elapsed_seconds": 0,
     }
     for file in files:
@@ -57,49 +62,50 @@ def batch_import(
                         m.raw_documents.c.source_name == file.name,
                     )
                 ).scalar_one_or_none()
+                is_empty_template = kind == "mr" and parsed.get("empty_template", False)
                 if existing:
                     stats["skipped"] += 1
-                    continue
-                uid = preserve_document(
-                    conn, kind, "text", content, parsed.get("record", {}).get("url"), file.name
-                )
-                if kind == "mr":
-                    repo = parsed["repository"]
-                    svc.store(
-                        conn,
-                        Repository.model_validate(repo),
-                    )
-                    parsed["record"]["repo"] = repo["url"]
-                    item = MergeRequest.model_validate(parsed["record"])
-                    entity_id = svc.store(conn, item, document_id=uid, source=f"document:{uid}")
-                    svc.attach(conn, uid, m.merge_requests, entity_id)
-                    for bug in parsed["bug_ids"]:
-                        _link_bug(conn, "mr", entity_id, bug)
-                    for ref in parsed["mr_references"]:
-                        _store_or_link(
-                            conn,
-                            "mr",
-                            entity_id,
-                            ref["reference"],
-                            stats,
-                            relation_type=ref["type"],
-                        )
+                    uid = existing
                 else:
-                    item = Task.model_validate(parsed["record"])
-                    entity_id = svc.store(conn, item, document_id=uid, source=f"document:{uid}")
-                    svc.attach(conn, uid, m.tasks, entity_id)
-                    for bug in parsed["bug_ids"]:
-                        _link_bug(conn, "task", entity_id, bug)
-                    for ref in parsed["links"]:
-                        if "merge_requests/" in ref or "!" in ref:
-                            _store_or_link(conn, "task", entity_id, ref, stats)
-                stats["created"] += 1
+                    source_url = (
+                        parsed.get("record", {}).get("url") if parsed.get("record") else None
+                    )
+                    uid = preserve_document(conn, kind, "text", content, source_url, file.name)
+                    stats["created"] += 1
+                    if is_empty_template:
+                        stats["empty_templates"] += 1
+                    elif kind == "mr":
+                        repo = parsed["repository"]
+                        svc.store(conn, Repository.model_validate(repo))
+                        parsed["record"]["repo"] = repo["url"]
+                        item = MergeRequest.model_validate(parsed["record"])
+                        entity_id = svc.store(conn, item, document_id=uid, source=f"document:{uid}")
+                        svc.attach(conn, uid, m.merge_requests, entity_id)
+                        for bug in parsed["bug_ids"]:
+                            _link_bug(conn, "mr", entity_id, bug)
+                        for ref in parsed["mr_references"]:
+                            _store_or_link(
+                                conn,
+                                "mr",
+                                entity_id,
+                                ref["reference"],
+                                stats,
+                                relation_type=ref["type"],
+                            )
+                    else:
+                        item = Task.model_validate(parsed["record"])
+                        entity_id = svc.store(conn, item, document_id=uid, source=f"document:{uid}")
+                        svc.attach(conn, uid, m.tasks, entity_id)
+                        for bug in parsed["bug_ids"]:
+                            _link_bug(conn, "task", entity_id, bug)
+                        for ref in parsed["links"]:
+                            if "merge_requests/" in ref or "!" in ref:
+                                _store_or_link(conn, "task", entity_id, ref, stats)
+            if is_empty_template:
+                progress(f"{file}: saved empty template as source only")
+                continue
             if extract:
-                preview = inspect_document(database, uid, refresh=True)
-                stats["llm_calls"] += preview.get("metrics", {}).get("calls", 0)
-                stats["input_tokens"] += preview.get("metrics", {}).get("input_tokens", 0)
-                stats["output_tokens"] += preview.get("metrics", {}).get("output_tokens", 0)
-                confirm_document(database, uid)
+                _classify(database, uid, provider, stats, progress)
             progress(str(file))
         except (ValueError, OSError, UnicodeError, CatalogError) as exc:
             stats["errors"] += 1
@@ -108,6 +114,61 @@ def batch_import(
         stats["links"] += _resolve(conn)
     stats["elapsed_seconds"] = round(time.monotonic() - start, 3)
     return stats
+
+
+def _classify(database, uid, provider, stats, progress):
+    preview = inspect_document(database, uid, provider=provider, refresh=True, progress=progress)
+    metrics = preview.get("metrics", {})
+    stats["llm_calls"] += metrics.get("calls", 0)
+    stats["input_tokens"] += metrics.get("input_tokens", 0)
+    stats["output_tokens"] += metrics.get("output_tokens", 0)
+    stats["classified_comments"] += _apply_comment_categories(database, uid, preview)
+
+
+def _apply_comment_categories(database, document_id, preview):
+    proposal = preview.get("proposal", {})
+    refs = proposal.get("source_comments", [])
+    if not refs:
+        return 0
+    updated = 0
+    with transaction(database, write=True) as conn:
+        document = svc.one(conn, m.raw_documents, id=document_id)
+        link = conn.execute(
+            select(m.document_links.c.merge_request_id).where(
+                m.document_links.c.document_id == document_id,
+                m.document_links.c.merge_request_id.is_not(None),
+            )
+        ).scalar_one_or_none()
+        if link is None:
+            return 0
+        lines = document["content"].splitlines(keepends=True)
+        comments = m.comments.join(m.discussions, m.comments.c.discussion_id == m.discussions.c.id)
+        comments = comments.join(m.users, m.comments.c.author_id == m.users.c.id)
+        for ref in refs:
+            if not ref.get("categories"):
+                continue
+            body = Lines.model_validate(ref["lines"]).read(lines)
+            candidates = conn.execute(
+                select(m.comments.c.id, m.comments.c.source_start_line)
+                .select_from(comments)
+                .where(
+                    m.discussions.c.merge_request_id == link,
+                    m.comments.c.body == body,
+                    m.users.c.username == ref["author"]["username"],
+                )
+            ).all()
+            source_line = ref["lines"]["first"]
+            match = next((row for row in candidates if row.source_start_line == source_line), None)
+            if match is None and len(candidates) == 1:
+                match = candidates[0]
+            if match:
+                conn.execute(
+                    m.comments.update()
+                    .where(m.comments.c.id == match.id)
+                    .values(category=", ".join(ref["categories"]))
+                )
+                updated += 1
+    return updated
 
 
 def _link_bug(conn, kind, uid, number):

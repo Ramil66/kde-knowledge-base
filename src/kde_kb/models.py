@@ -200,6 +200,7 @@ comments = Table(
     string("updated_at"),
     Column("source_start_line", Integer),
     Column("source_end_line", Integer),
+    Column("review_locations", JSON),
     UniqueConstraint("discussion_id", "external_id"),
     UniqueConstraint("discussion_id", "id"),
     ForeignKeyConstraint(

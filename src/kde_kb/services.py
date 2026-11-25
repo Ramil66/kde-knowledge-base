@@ -355,7 +355,8 @@ def store(
         data = run.model_dump(mode="json") | {"branch_id": branch_id}
         save(conn, m.test_runs, data, data)
     for index, discussion in enumerate(item.discussions):
-        scope = f"document:{document_id}:mr:{mr_id}:discussion:{index}"
+        stable_thread = discussion.external_id or str(index)
+        scope = f"mr:{mr_id}:discussion:{stable_thread}"
         save_discussion(conn, mr_id, discussion, scope, source)
     revision_id = None
     if item.revision or item.commits or "commits" in item.model_fields_set:
