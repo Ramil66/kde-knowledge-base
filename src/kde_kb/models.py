@@ -198,6 +198,8 @@ comments = Table(
     string("url"),
     string("created_at"),
     string("updated_at"),
+    Column("source_start_line", Integer),
+    Column("source_end_line", Integer),
     UniqueConstraint("discussion_id", "external_id"),
     UniqueConstraint("discussion_id", "id"),
     ForeignKeyConstraint(
@@ -270,6 +272,15 @@ for table_name, target in (
         CheckConstraint("entity_id <> depends_on_id"),
     )
 
+mr_relations = Table(
+    "mr_relations",
+    metadata,
+    fk("merge_request_id", "merge_requests", primary=True, cascade=True),
+    fk("related_merge_request_id", "merge_requests", primary=True, cascade=True),
+    string("relation_type", required=True),
+    CheckConstraint("merge_request_id <> related_merge_request_id"),
+)
+
 task_events = Table(
     "task_events",
     metadata,
@@ -302,6 +313,7 @@ raw_documents = Table(
     string("source_url"),
     string("content", required=True),
     string("content_hash", required=True),
+    string("source_name"),
     string("format", required=True),
     Column("created_at", Text, nullable=False, server_default=text("CURRENT_TIMESTAMP")),
     Column("metadata", JSON),
@@ -311,6 +323,7 @@ Index(
     raw_documents.c.document_type,
     raw_documents.c.format,
     func.coalesce(raw_documents.c.source_url, ""),
+    func.coalesce(raw_documents.c.source_name, ""),
     raw_documents.c.content_hash,
     unique=True,
 )
@@ -394,4 +407,43 @@ import_checkpoints = Table(
     fk("document_id", "raw_documents", cascade=True),
     string("stage", required=True),
     Column("result", JSON, nullable=False),
+)
+
+bug_reports = Table(
+    "bug_reports",
+    metadata,
+    pk(),
+    Column("external_id", Integer, nullable=False, unique=True),
+    string("title"),
+    string("status"),
+    string("resolution"),
+    string("url"),
+    string("product"),
+    string("component"),
+    string("description"),
+    string("created_at"),
+    string("updated_at"),
+)
+task_bug_reports = Table(
+    "task_bug_reports",
+    metadata,
+    fk("task_id", "tasks", primary=True, cascade=True),
+    fk("bug_report_id", "bug_reports", primary=True, cascade=True),
+)
+mr_bug_reports = Table(
+    "mr_bug_reports",
+    metadata,
+    fk("merge_request_id", "merge_requests", primary=True, cascade=True),
+    fk("bug_report_id", "bug_reports", primary=True, cascade=True),
+)
+unresolved_links = Table(
+    "unresolved_links",
+    metadata,
+    pk(),
+    string("source_type", required=True),
+    Column("source_id", Integer, nullable=False),
+    string("link_type", required=True),
+    Column("repository_url", Text),
+    Column("external_id", Integer, nullable=False),
+    UniqueConstraint("source_type", "source_id", "link_type", "repository_url", "external_id"),
 )

@@ -175,6 +175,8 @@ class Comment(Input):
     created_at: Date | None = None
     updated_at: Date | None = None
     position: Position | None = None
+    source_start_line: PositiveInt | None = None
+    source_end_line: PositiveInt | None = None
 
 
 class Discussion(Input):

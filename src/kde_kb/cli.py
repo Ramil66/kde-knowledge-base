@@ -17,6 +17,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from . import models as m
 from . import services as svc
+from .batch import batch_import
 from .database import (
     CatalogError,
     backup,
@@ -404,6 +405,27 @@ def import_command(kind: Kind) -> Callable[..., None]:
 
 for kind in ("repo", "task", "mr", "diff"):
     imports.command(kind)(import_command(cast(Kind, kind)))
+
+
+@imports.command("directory")
+def import_directory(
+    ctx: typer.Context,
+    path: Annotated[Path, typer.Option("--path")],
+    extract: bool = False,
+    no_llm: bool = False,
+    dry_run: bool = False,
+) -> None:
+    if extract and no_llm:
+        raise CatalogError("--extract and --no-llm are mutually exclusive")
+    output(
+        batch_import(
+            ctx.obj,
+            path,
+            extract=extract and not no_llm,
+            dry_run=dry_run,
+            progress=lambda value: typer.echo(value, err=True),
+        )
+    )
 
 
 class Entity(StrEnum):

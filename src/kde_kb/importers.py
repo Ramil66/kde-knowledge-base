@@ -85,6 +85,7 @@ def preserve_document(
         "format": fmt,
         "source_url": source_url or None,
         "content_hash": hashlib.sha256(content.encode("utf-8")).hexdigest(),
+        "source_name": filename,
     }
     existing = conn.execute(select(m.raw_documents.c.id).filter_by(**key)).scalar_one_or_none()
     document_id = (
