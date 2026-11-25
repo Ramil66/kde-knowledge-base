@@ -325,7 +325,8 @@ def save_preview(path: Path, uid: int, data: dict, previous: dict | None) -> dic
             if current:
                 return current
             raise CatalogError("Document changed during extraction")
-        if current and all(data[k] == current[k] for k in ("model", "prompt_version", "proposal")):
+        comparable = ("model", "prompt_version", "proposal", "metrics")
+        if current and all(data.get(k) == current.get(k) for k in comparable):
             return current
         if current and current["status"] == "pending":
             conn.execute(

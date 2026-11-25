@@ -1,16 +1,14 @@
 import json
 from pathlib import Path
 
-import pytest
-
 from kde_kb import models as m
 from kde_kb import services as svc
 from kde_kb.database import migrate_database, transaction
 from kde_kb.extraction import confirm_document, inspect_document
-from kde_kb.import_stages import SYSTEM, blocks
+from kde_kb.import_stages import blocks
 from kde_kb.importers import preserve_document
 from kde_kb.invent import Lines, SourceComment, parse_page
-from kde_kb.providers import GenerationResponse, MockProvider, ProviderError, settings
+from kde_kb.providers import MockProvider, settings
 
 SAMPLE_TEXT = """core: Add a reusable FuseMountJob
 Open
@@ -89,55 +87,36 @@ def test_offline_preview_and_confirm(tmp_path: Path) -> None:
         assert notes[0]["parent_comment_id"] is None and notes[1]["parent_comment_id"] is None
 
 
-class Classifier:
-    def __init__(self, fail_on=None):
-        self.calls = []
-        self.fail_on = fail_on
-
-    def generate(self, request):
-        self.calls.append(request)
-        if len(self.calls) == self.fail_on:
-            raise ProviderError("Interrupted")
-        values = json.loads(request.document)
-        assert request.system == SYSTEM and all(isinstance(v, str) for v in values)
-        assert len(request.document.encode()) <= 1024
-        if request.on_chunk:
-            request.on_chunk(5)
-        return GenerationResponse(
-            json.dumps({"labels": [1] * len(values)}), "mock-classifier", 100, 8
-        )
-
-
 def test_resume_reuse_and_metrics(tmp_path: Path, monkeypatch) -> None:
     path = tmp_path / "catalog"
     config = tmp_path / "config.toml"
-    config.write_text("[llm]\nattempts=1\nblock_size=180\n")
+    config.write_text("[llm]\nattempts=1\nblock_size=8192\n")
     monkeypatch.setenv("KDE_KB_CONFIG", str(config))
     migrate_database(path)
     source = SAMPLE_TEXT
     with transaction(path, write=True) as conn:
         uid = preserve_document(conn, "mr", "text", source, URL)
-    messages = []
-    first = Classifier(fail_on=1)
-    with pytest.raises(ProviderError):
-        inspect_document(path, uid, provider=first, progress=messages.append)
+    first = MockProvider('{"labels":[]}', '{"labels":[]}', '{"labels":[]}')
+    failed = inspect_document(path, uid, provider=first)
+    assert failed["metrics"]["calls"] == 3
+    assert failed["metrics"]["failed_comments"] == 2
+    assert failed["metrics"]["input_tokens"] > 0 and failed["metrics"]["output_tokens"] > 0
     with transaction(path) as conn:
-        assert not svc.rows(conn, m.document_extractions)
+        assert not [
+            row for row in svc.rows(conn, m.import_checkpoints) if row["stage"] == "classify"
+        ]
         assert [row["stage"] for row in svc.rows(conn, m.import_checkpoints)] == ["parse"]
-    second = Classifier()
-    preview = inspect_document(path, uid, provider=second, progress=messages.append)
+    second = MockProvider('{"labels":[1,4]}')
+    preview = inspect_document(path, uid, provider=second, refresh=True)
     stats = preview["metrics"]
-    assert stats["model"] == "mock-classifier"
+    assert stats["model"] == "mock"
     assert stats["cached_blocks"] == 0 and stats["reused_input_tokens"] == 0
-    assert (
-        stats["input_tokens"] == len(second.calls) * 100
-        and stats["output_tokens"] == len(second.calls) * 8
-    )
-    assert stats["estimated_calls"] == 0 and len(second.calls) == 1
-    assert any("generated characters" in message for message in messages)
-    assert all(
-        c["categories"] == ["change-request"] for c in preview["proposal"]["source_comments"]
-    )
+    assert stats["input_tokens"] > 0 and stats["output_tokens"] > 0
+    assert stats["estimated_calls"] == 1 and len(second.requests) == 1
+    assert [c["categories"] for c in preview["proposal"]["source_comments"]] == [
+        ["change-request"],
+        ["resolution"],
+    ]
     assert inspect_document(path, uid, provider=MockProvider())["id"] == preview["id"]
     # A changed activity feed, with the same comments, reuses all completed semantic jobs.
     with transaction(path, write=True) as conn:
@@ -148,9 +127,9 @@ def test_resume_reuse_and_metrics(tmp_path: Path, monkeypatch) -> None:
             source.replace("Merge request pipeline passed", "Merge request pipeline failed"),
             URL,
         )
-    third = Classifier()
+    third = MockProvider()
     updated = inspect_document(path, uid2, provider=third)
-    assert uid2 != uid and not third.calls and updated["metrics"]["cached_blocks"] == 1
+    assert uid2 != uid and not third.requests and updated["metrics"]["cached_blocks"] == 1
 
 
 def test_long_unicode_excerpts_are_bounded(monkeypatch, tmp_path: Path) -> None:
@@ -171,3 +150,69 @@ def test_long_unicode_excerpts_are_bounded(monkeypatch, tmp_path: Path) -> None:
         <= 40
         for job in jobs
     )
+
+
+def test_invalid_label_count_splits_and_caches_successful_subblocks(tmp_path, monkeypatch):
+    path = tmp_path / "catalog"
+    config = tmp_path / "config.toml"
+    config.write_text("[llm]\nattempts=1\nblock_size=8192\nnum_predict=64\n")
+    monkeypatch.setenv("KDE_KB_CONFIG", str(config))
+    migrate_database(path)
+    with transaction(path, write=True) as conn:
+        uid = preserve_document(conn, "mr", "text", SAMPLE_TEXT, URL)
+
+    model = MockProvider(
+        '{"labels":[1]}',
+        '{"labels":[1]}',
+        '{"labels":[2]}',
+    )
+    preview = inspect_document(path, uid, provider=model)
+    assert preview["metrics"]["calls"] == 3
+    assert preview["metrics"]["failed_comments"] == 0
+    assert preview["metrics"]["input_tokens"] > 0
+    assert preview["metrics"]["output_tokens"] > 0
+    assert [c["categories"] for c in preview["proposal"]["source_comments"]] == [
+        ["change-request"],
+        ["question"],
+    ]
+    assert [request.schema["properties"]["labels"]["minItems"] for request in model.requests] == [
+        2,
+        1,
+        1,
+    ]
+    assert [
+        f"exactly {count} " in request.system
+        for request, count in zip(model.requests, [2, 1, 1], strict=True)
+    ] == [True, True, True]
+    with transaction(path) as conn:
+        assert (
+            len([r for r in svc.rows(conn, m.import_checkpoints) if r["stage"] == "classify"]) == 2
+        )
+
+    retry = MockProvider('{"labels":[]}')
+    resumed = inspect_document(path, uid, provider=retry, refresh=True)
+    assert resumed["metrics"]["calls"] == 1
+    assert resumed["metrics"]["cached_blocks"] == 2
+    assert resumed["metrics"]["input_tokens"] > 0
+
+
+def test_unclassifiable_single_excerpt_keeps_raw_and_continues(tmp_path, monkeypatch):
+    path = tmp_path / "catalog"
+    config = tmp_path / "config.toml"
+    config.write_text("[llm]\nattempts=2\nblock_size=8192\nnum_predict=64\n")
+    monkeypatch.setenv("KDE_KB_CONFIG", str(config))
+    migrate_database(path)
+    one_comment = SAMPLE_TEXT.split("Méven Car\nMéven Car\n@meven", 1)[0]
+    with transaction(path, write=True) as conn:
+        uid = preserve_document(conn, "mr", "text", one_comment, URL)
+
+    model = MockProvider('{"labels":[]}', '{"labels":[1,2]}')
+    preview = inspect_document(path, uid, provider=model)
+    assert preview["metrics"]["calls"] == 2
+    assert preview["metrics"]["failed_comments"] == 1
+    assert preview["metrics"]["input_tokens"] > 0
+    assert preview["metrics"]["output_tokens"] > 0
+    assert not preview["proposal"]["source_comments"][0].get("categories")
+    with transaction(path) as conn:
+        saved = svc.one(conn, m.raw_documents, id=uid)
+        assert "Please preserve the original error." in saved["content"]

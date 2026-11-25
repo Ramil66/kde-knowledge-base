@@ -372,6 +372,23 @@ def import_progress() -> Callable[[str], None]:
     return report
 
 
+def directory_progress() -> Callable[[str], None]:
+    active = False
+
+    def report(message: str) -> None:
+        nonlocal active
+        if message.startswith("Review block") or "generated characters" in message:
+            typer.echo(f"\r{message}", err=True, nl=False)
+            active = True
+            return
+        if active:
+            typer.echo("", err=True)
+            active = False
+        typer.echo(message, err=True)
+
+    return report
+
+
 def import_command(kind: Kind) -> Callable[..., None]:
     def run(
         ctx: typer.Context,
@@ -423,7 +440,7 @@ def import_directory(
             path,
             extract=extract and not no_llm,
             dry_run=dry_run,
-            progress=lambda value: typer.echo(value, err=True),
+            progress=directory_progress(),
         )
     )
 

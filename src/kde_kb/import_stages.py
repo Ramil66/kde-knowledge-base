@@ -36,6 +36,28 @@ def compact(value: object) -> str:
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
 
 
+def schema_for_count(count: int) -> dict:
+    return {
+        "type": "object",
+        "properties": {
+            "labels": {
+                "type": "array",
+                "items": {"type": "integer", "enum": [0, 1, 2, 3, 4]},
+                "minItems": count,
+                "maxItems": count,
+            }
+        },
+        "required": ["labels"],
+        "additionalProperties": False,
+    }
+
+
+def system_for_count(count: int) -> str:
+    return (
+        f"{SYSTEM} The input contains exactly {count} excerpts; return exactly {count} label IDs."
+    )
+
+
 def cache_key(*values: object) -> str:
     return hashlib.sha256(compact(values).encode()).hexdigest()
 
@@ -105,7 +127,7 @@ def blocks(
 def classify(
     provider: LLMProvider,
     request: GenerationRequest,
-    count: int,
+    expected_count: int,
     config: Settings,
     metrics: dict,
     progress: Progress,
@@ -121,7 +143,10 @@ def classify(
             metrics["input_tokens"] += (
                 usage[0]
                 if usage[0] is not None
-                else (len((SYSTEM + request.document + compact(SCHEMA)).encode()) + 3) // 4
+                else (
+                    len((request.system + request.document + compact(request.schema)).encode()) + 3
+                )
+                // 4
             )
             metrics["output_tokens"] += (
                 usage[1] if usage[1] is not None else (len(response.content.encode()) + 3) // 4
@@ -130,7 +155,7 @@ def classify(
             labels = parsed.get("labels") if isinstance(parsed, dict) and len(parsed) == 1 else None
             if (
                 not isinstance(labels, list)
-                or len(labels) != count
+                or len(labels) != expected_count
                 or any(type(i) is not int or not 0 <= i < len(CATEGORIES) for i in labels)
             ):
                 raise ValueError("Expected one category ID per excerpt")
@@ -184,6 +209,7 @@ def analyze_mr(
         "output_tokens": 0,
         "estimated_calls": 0,
         "unmetered_calls": 0,
+        "failed_comments": 0,
     }
     metrics.update(reused_input_tokens=0, reused_output_tokens=0)
     if offline or not comments:
@@ -191,8 +217,14 @@ def analyze_mr(
     provider = provider or configured_provider(config)
     jobs = list(blocks(comments, document["content"].splitlines(keepends=True), config))
     by_id = {ref.id: ref for ref in comments}
-    for i, job in enumerate(jobs, 1):
+    labels_by_id: dict[int, list[int]] = {}
+    failed_ref_ids: set[int] = set()
+
+    def process(job: list[tuple[int, str]], label: str) -> None:
+        expected_count = len(job)
         payload = compact([piece for _, piece in job])
+        prompt = system_for_count(expected_count)
+        schema = schema_for_count(expected_count)
         key = cache_key(
             VERSION,
             type(provider).__qualname__,
@@ -202,33 +234,62 @@ def analyze_mr(
             config.temperature,
             config.num_ctx,
             config.num_predict,
+            expected_count,
+            prompt,
+            schema,
             payload,
         )
-        prefix = f"Review block {i}/{len(jobs)}"
         result = read_cache(path, key)
-        if result is None:
-            progress(prefix)
-            chars = 0
-
-            def advanced(n: int, block_prefix: str = prefix) -> None:
-                nonlocal chars
-                chars += n
-                progress(f"{block_prefix}: {chars} generated characters")
-
-            request = GenerationRequest(SYSTEM, payload, SCHEMA, VERSION, advanced)
-            result = classify(provider, request, len(job), config, metrics, progress)
-            if not dry_run:
-                result = store_cache(path, uid, key, "classify", result)
-        else:
-            progress(f"{prefix}: cached")
+        if result is not None:
+            progress(f"{label}: cached")
             metrics["cached_blocks"] += 1
             metrics["reused_input_tokens"] += result["usage"]["input_tokens"]
             metrics["reused_output_tokens"] += result["usage"]["output_tokens"]
+        else:
+            progress(f"{label}: 0 generated characters")
+            chars = 0
+
+            def advanced(n: int, block_label: str = label) -> None:
+                nonlocal chars
+                chars += n
+                progress(f"{block_label}: {chars} generated characters")
+
+            request = GenerationRequest(prompt, payload, schema, VERSION, advanced)
+            try:
+                result = classify(
+                    provider,
+                    request,
+                    expected_count,
+                    config,
+                    metrics,
+                    lambda message: progress(f"{label}: {message}"),
+                )
+            except ProviderError:
+                if expected_count > 1:
+                    middle = expected_count // 2
+                    progress(f"{label}: invalid response; splitting block")
+                    process(job[:middle], f"{label}.1")
+                    process(job[middle:], f"{label}.2")
+                else:
+                    failed_ref_ids.add(job[0][0])
+                    progress(f"{label}: kept raw, unclassified excerpt")
+                return
+            if not dry_run:
+                result = store_cache(path, uid, key, "classify", result)
         metrics["model"] = result["model"]
-        for (ref_id, _), label in zip(job, result["labels"], strict=True):
-            categories = by_id[ref_id].categories
+        for (ref_id, _), category_id in zip(job, result["labels"], strict=True):
+            labels_by_id.setdefault(ref_id, []).append(category_id)
+
+    for i, job in enumerate(jobs, 1):
+        process(job, f"Review block {i}/{len(jobs)}")
+    for ref_id, ref_labels in labels_by_id.items():
+        if ref_id in failed_ref_ids:
+            continue
+        categories = by_id[ref_id].categories
+        for label in ref_labels:
             if label and CATEGORIES[label] not in categories:
                 categories.append(CATEGORIES[label])
+    metrics["failed_comments"] = len(failed_ref_ids)
     proposal["source_comments"] = [
         c.model_dump(exclude_none=True, exclude_defaults=True) for c in comments
     ]

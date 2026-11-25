@@ -41,6 +41,7 @@ def batch_import(
         "llm_calls": 0,
         "input_tokens": 0,
         "output_tokens": 0,
+        "failed_comments": 0,
         "classified_comments": 0,
         "elapsed_seconds": 0,
     }
@@ -122,6 +123,7 @@ def _classify(database, uid, provider, stats, progress):
     stats["llm_calls"] += metrics.get("calls", 0)
     stats["input_tokens"] += metrics.get("input_tokens", 0)
     stats["output_tokens"] += metrics.get("output_tokens", 0)
+    stats["failed_comments"] += metrics.get("failed_comments", 0)
     stats["classified_comments"] += _apply_comment_categories(database, uid, preview)
 
 
